@@ -50,11 +50,6 @@ namespace gh_sofistik
          get { return "GH_StructuralPoint"; }
       }
 
-      public BoundingBox ClippingBox
-      {
-         get { return Boundingbox; }
-      }
-
       public override IGH_GeometricGoo DuplicateGeometry()
       {
          return new GH_StructuralPoint()
@@ -70,6 +65,23 @@ namespace gh_sofistik
       public override BoundingBox GetBoundingBox(Transform xform)
       {
          return xform.TransformBoundingBox(Value.GetBoundingBox(true));
+      }
+
+      public override bool CastTo<Q>( out Q target)
+      {
+         if(Value != null)
+         {
+            // cast to GH_Point (Caution: this loses all structural information)
+            if (typeof(Q).IsAssignableFrom(typeof(GH_Point)))
+            {
+               var gp = new GH_Point(this.Value.Location);
+               target = (Q)(object)gp;
+               return true;
+            }
+         }
+
+         target = default(Q);
+         return false;
       }
 
       public override IGH_GeometricGoo Morph(SpaceMorph xmorph)
@@ -93,6 +105,11 @@ namespace gh_sofistik
          return this.Value.ToString();
       }
 
+      public BoundingBox ClippingBox
+      {
+         get { return Boundingbox; }
+      }
+
       public void DrawViewportWires(GH_PreviewWireArgs args)
       {
          if(Value != null)
@@ -111,7 +128,7 @@ namespace gh_sofistik
    public class CreateStructuralPoint : GH_Component
    {
       public CreateStructuralPoint()
-         : base("SPT", "SPT", "Assign SOFiSTiK Properties to Points", "SOFiSTiK", "Geometry")
+         : base("SPT", "SPT", "Create SOFiSTiK Structural Points", "SOFiSTiK", "Geometry")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -154,7 +171,7 @@ namespace gh_sofistik
 
          var gh_structural_points = new List<GH_StructuralPoint>();
 
-         for (int i=0; i<points.Count; ++i)
+         for (int i = 0; i < points.Count; ++i)
          {
             var p3d = points[i];
 
@@ -170,6 +187,21 @@ namespace gh_sofistik
          }
 
          DA.SetDataList(0, gh_structural_points);
+
+         //var geometry_points = new List<Point>();
+
+         //for(int i=0; i<points.Count; ++i)
+         //{
+         //   var p3 = points[i];
+
+         //   var p = new Point(p3);
+         //   p.SetUserString("SOF_ID", ids[i].ToString());
+         //   p.SetUserString("SOF_SPT_FIX", fix_literal);
+
+         //   geometry_points.Add(p);
+         //}
+
+         //DA.SetDataList(0, geometry_points);
       }
 
       public override Guid ComponentGuid

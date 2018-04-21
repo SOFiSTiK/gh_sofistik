@@ -77,9 +77,9 @@ namespace gh_sofistik
 
                sout.AppendLine();
             }
-            else if(g is GH_StructuralCurve)
+            else if(g is GH_StructuralLine)
             {
-               var gc = g as GH_StructuralCurve;
+               var gc = g as GH_StructuralLine;
                var c = gc.Value;
 
                string id_string = gc.Id > 0 ? gc.Id.ToString() : "-";
@@ -155,6 +155,10 @@ namespace gh_sofistik
             {
                sout.AppendFormat("SAR ");
                sout.AppendLine();
+            }
+            else
+            {
+               throw new ArgumentException("Encountered type not supported: " + g.GetType().ToString());
             }
          }
          sout.AppendLine();
