@@ -10,23 +10,30 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   // class implementing a GH_ container for Rhino.Geometry.Point
-   public class GH_GeometryPoint : Grasshopper.Kernel.Types.GH_GeometricGoo<Point>
+   public class Utils
    {
+      public static void FillIdentifierList(List<int> ids, int Size)
+      {
+         if (ids.Count == 0 || ids.First() == 0)
+         {
+            while (ids.Count < Size)
+               ids.Add(0);
+         }
+         else
+         {
+            while (ids.Count < Size)
+               ids.Add(ids.Last() + 1);
+         }
+      }
+   }
+
+   // class implementing a GH_ container for Rhino.Geometry.Point
+   public class GH_StructuralPoint : GH_GeometricGoo<Point>, IGH_PreviewData
+   {
+      public int Id { get; set; } = 0;
       public Vector3d DirectionLocalX { get; set; } = new Vector3d();
       public Vector3d DirectionLocalZ { get; set; } = new Vector3d();
       public string FixLiteral { get; set; } = string.Empty;
-
-      public GH_GeometryPoint(Point p)
-         : base()
-      {
-         Value = p;
-      }
-
-      public GH_GeometryPoint(Point3d location)
-      {
-         Value = new Point(location);
-      }
 
       public override BoundingBox Boundingbox
       {
@@ -35,17 +42,29 @@ namespace gh_sofistik
 
       public override string TypeDescription
       {
-         get { return "Generic Point: " + this.Value?.ToString(); }
+         get { return Value.ToString() + " with Structural Properties"; }
       }
 
       public override string TypeName
       {
-         get { return "GH_GeometryPoint"; }
+         get { return "GH_StructuralPoint"; }
+      }
+
+      public BoundingBox ClippingBox
+      {
+         get { return Boundingbox; }
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
       {
-         return new GH_GeometryPoint(this.Value.Location);
+         return new GH_StructuralPoint()
+         {
+            Value = new Point(this.Value.Location),
+            Id = this.Id,
+            DirectionLocalX = this.DirectionLocalX,
+            DirectionLocalZ = this.DirectionLocalZ,
+            FixLiteral = this.FixLiteral
+         };
       }
 
       public override BoundingBox GetBoundingBox(Transform xform)
@@ -55,7 +74,18 @@ namespace gh_sofistik
 
       public override IGH_GeometricGoo Morph(SpaceMorph xmorph)
       {
-         return new GH_GeometryPoint(xmorph.MorphPoint(this.Value.Location));
+         var dup = this.DuplicateGeometry() as GH_StructuralPoint;
+         xmorph.Morph(dup.Value);
+
+         return dup;
+      }
+
+      public override IGH_GeometricGoo Transform(Transform xform)
+      {
+         var dup = this.DuplicateGeometry() as GH_StructuralPoint;
+         dup.Value.Transform(xform);
+
+         return dup;
       }
 
       public override string ToString()
@@ -63,20 +93,25 @@ namespace gh_sofistik
          return this.Value.ToString();
       }
 
-      public override IGH_GeometricGoo Transform(Transform xform)
+      public void DrawViewportWires(GH_PreviewWireArgs args)
       {
-         Point3d location = this.Value.Location;
-         location.Transform(xform);
+         if(Value != null)
+         {
+            args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, System.Drawing.Color.Red);
+         }
+      }
 
-         return new GH_GeometryPoint(location);
+      public void DrawViewportMeshes(GH_PreviewMeshArgs args)
+      {
+         // no need to draw meshes 
       }
    }
 
-
+   // create structural point
    public class CreateStructuralPoint : GH_Component
    {
       public CreateStructuralPoint()
-         : base("SPT", "SPT", "Sets Structural point properties", "SOFiSTiK", "Geometry")
+         : base("SPT", "SPT", "Assign SOFiSTiK Properties to Points", "SOFiSTiK", "Geometry")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -86,48 +121,55 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
+         var ids = new List<int>(); ids.Add(0);
+
          pManager.AddPointParameter("Point", "P", "List of Points", GH_ParamAccess.list);
-         pManager.AddVectorParameter("Local X", "TX", "Direction of local x-coordinate", GH_ParamAccess.item, new Vector3d());
-         pManager.AddVectorParameter("Local Z", "TZ", "Direction of local z-coordinate", GH_ParamAccess.item, new Vector3d());
+         pManager.AddIntegerParameter("Id", "Id", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local X", "Tx", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddVectorParameter("Local Z", "Tz", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
          pManager.AddTextParameter("Fix", "Fix", "Support condition literal", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Point", "P", "Point with assignments", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Point", "P", "Point with SOFiSTiK properties", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess DA)
       {
-         var points3d = new List<Point3d>();
+         var points = new List<Point3d>();
 
-         string fix_literal = string.Empty;
+         var ids = new List<int>();
          var sx = new Vector3d();
          var sz = new Vector3d();
+         string fix_literal = string.Empty;
 
-         if (!DA.GetDataList(0, points3d)) return;
-         if (!DA.GetData(1, ref sx)) return;
-         if (!DA.GetData(2, ref sz)) return;
-         if (!DA.GetData(3, ref fix_literal)) return;
+         if (!DA.GetDataList(0, points)) return;
+         if (!DA.GetDataList(1, ids)) return;
+         if (!DA.GetData(2, ref sx)) return;
+         if (!DA.GetData(3, ref sz)) return;
+         if (!DA.GetData(4, ref fix_literal)) return;
 
-         var gh_geometry_points = new List<GH_GeometryPoint>();
-         foreach (var p3d in points3d)
+         Utils.FillIdentifierList(ids, points.Count);
+
+         var gh_structural_points = new List<GH_StructuralPoint>();
+
+         for (int i=0; i<points.Count; ++i)
          {
-            var gp = new GH_GeometryPoint(p3d);
+            var p3d = points[i];
 
-            if (sx.Length > 0.0)
-               gp.DirectionLocalX = sx;
-
-            if (sz.Length > 0.0)
-               gp.DirectionLocalZ = sz;
-
-            if (string.IsNullOrWhiteSpace(fix_literal) == false)
-               gp.FixLiteral = fix_literal;
-
-            gh_geometry_points.Add(gp);
+            var gp = new GH_StructuralPoint()
+            {
+               Value = new Point(p3d),
+               Id = ids[i],
+               DirectionLocalX = sx,
+               DirectionLocalZ = sz,
+               FixLiteral = fix_literal
+            };
+            gh_structural_points.Add(gp);
          }
 
-         DA.SetDataList(0, gh_geometry_points);
+         DA.SetDataList(0, gh_structural_points);
       }
 
       public override Guid ComponentGuid

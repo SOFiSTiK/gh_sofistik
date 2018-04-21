@@ -57,12 +57,14 @@ namespace gh_sofistik
          // write structural lines
          foreach( var g in geometry )
          {
-            if(g is GH_GeometryPoint)
+            if(g is GH_StructuralPoint)
             {
-               var gp = g as GH_GeometryPoint;
-
+               var gp = g as GH_StructuralPoint;
                Point3d p = gp.Value.Location;
-               sout.AppendFormat("SPT - X {0:F6} {1:F6} {2:F6}",p.X,p.Y,p.Z);
+
+               string id_string = gp.Id > 0 ? gp.Id.ToString() : "-";
+
+               sout.AppendFormat("SPT {0} X {1:F6} {2:F6} {3:F6}",id_string, p.X, p.Y, p.Z);
 
                if (gp.DirectionLocalX.Length > 0.0)
                   sout.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", gp.DirectionLocalX.X, gp.DirectionLocalX.Y, gp.DirectionLocalX.Z);
@@ -75,18 +77,21 @@ namespace gh_sofistik
 
                sout.AppendLine();
             }
-            else if(g is GH_Curve)
+            else if(g is GH_StructuralCurve)
             {
-               var gc = g as GH_Curve;
+               var gc = g as GH_StructuralCurve;
                var c = gc.Value;
 
-               string grp_string = c.GetUserString("SOF_SLN_GRP");
-               string sno_string = c.GetUserString("SOF_SLN_SNO");
+               string id_string = gc.Id > 0 ? gc.Id.ToString() : "-";
 
-               int grp = string.IsNullOrEmpty(grp_string) ? 0 : int.Parse(grp_string);
-               int sno = string.IsNullOrEmpty(sno_string) ? 0 : int.Parse(sno_string);
+               sout.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, gc.GroupId, gc.SectionId);
 
-               sout.AppendFormat("SLN - GRP {0} SNO {1}", grp,sno);
+               if (gc.DirectionLocalZ.Length > 0.0)
+                  sout.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", gc.DirectionLocalZ.X, gc.DirectionLocalZ.Y, gc.DirectionLocalZ.Z);
+
+               if (string.IsNullOrWhiteSpace(gc.FixLiteral) == false)
+                  sout.AppendFormat(" FIX {0}", gc.FixLiteral);
+
                sout.AppendLine();
 
                if(c is LineCurve)
