@@ -79,10 +79,10 @@ namespace gh_sofistik
          : base("SPT", "SPT", "Sets Structural point properties", "SOFiSTiK", "Geometry")
       { }
 
-      //protected override System.Drawing.Bitmap Icon
-      //{
-      //   get { return new System.Drawing.Bitmap(); }
-      //}
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.structural_point16; }
+      }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {

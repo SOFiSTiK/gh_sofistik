@@ -14,10 +14,10 @@ namespace gh_sofistik
          : base("SLN","SLN","Sets Structural line properties","SOFiSTiK","Geometry")
       {}
 
-      //protected override System.Drawing.Bitmap Icon
-      //{
-      //   get { return new System.Drawing.Bitmap(); }
-      //}
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.structural_line16; }
+      }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {

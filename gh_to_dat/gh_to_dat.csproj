@@ -54,12 +54,38 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Properties\" />
+    <None Include="Resources\img_structural_line.png" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
     <Compile Include="src\gh_sln_factory.cs" />
     <Compile Include="src\gh_sofimshc.cs" />
     <Compile Include="src\gh_spt_factory.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_line16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_point16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\structural_area16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_area16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofistik_32x32.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

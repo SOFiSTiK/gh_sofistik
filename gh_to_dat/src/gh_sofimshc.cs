@@ -15,6 +15,11 @@ namespace gh_sofistik
          : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK","Geometry")
       { }
 
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.sofistik_32x32; }
+      }
+
       public override Guid ComponentGuid
       {
          get { return new Guid("F46E8DA9-205A-4623-8331-8F911C7DA0DC"); }
