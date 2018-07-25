@@ -5,12 +5,14 @@ using System.Text;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
+using Rhino;
+using Rhino.DocObjects;
 using Rhino.Geometry;
 
 namespace gh_sofistik
 {
    // class implementing a GH_ container for Rhino.Geometry.Curve
-   public class GH_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData
+   public class GH_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData, IGH_BakeAwareData
    {
       public int Id { get; set; } = 0;
       public int GroupId { get; set; } = 0;    
@@ -126,6 +128,37 @@ namespace gh_sofistik
       {
          // no need to draw meshes
       }
+
+      public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)
+      {
+         if (Value != null)
+         {
+            var att = baking_attributes.Duplicate();
+
+            att.SetUserString("SOF_OBJ_TYPE", "SLN");
+            if(this.Id > 0)
+               att.SetUserString("SOF_ID", this.Id.ToString());
+            if(this.GroupId > 0)
+               att.SetUserString("SOF_GRP", this.GroupId.ToString());
+            if(this.SectionId > 0)
+            {
+               att.SetUserString("SOF_STYP", "B");
+               att.SetUserString("SOF_STYP2", "E");
+               att.SetUserString("SOF_SNO", this.SectionId.ToString());
+               att.SetUserString("SOF_SNOE", "SOF_PROP_COMBO_NONE");
+            }
+            att.SetUserString("SOF_SDIV", "0.0");
+
+            // TODO: add attributes
+
+            obj_guid = doc.Objects.AddCurve(Value, att);
+         }
+         else
+         {
+            obj_guid = new Guid();
+         }
+         return true;
+      }
    }
 
    // create structural line
@@ -143,11 +176,11 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddCurveParameter("Curve", "C", "List of Curves", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Id", "Id", "List of Ids (or start Id if only one given)", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Group", "Grp", "Group membership", GH_ParamAccess.item, 0);
-         pManager.AddIntegerParameter("Section", "Sno", "Identifier of cross section", GH_ParamAccess.item, 0);
-         pManager.AddVectorParameter("Local Z", "Tz", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
-         pManager.AddTextParameter("Fix", "Fix", "Support condition literal", GH_ParamAccess.item, string.Empty);
+         pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "GRP", "Group membership", GH_ParamAccess.item, 0);
+         pManager.AddIntegerParameter("Section", "SNO", "Identifier of cross section", GH_ParamAccess.item, 0);
+         pManager.AddVectorParameter("Local Z", "TZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)

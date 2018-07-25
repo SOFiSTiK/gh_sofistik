@@ -151,11 +151,11 @@ namespace gh_sofistik
                   throw new ArgumentException("Encountered curve type is not supported: " + g.GetType().ToString());
                }
             }
-            else if(g is GH_Surface)
-            {
-               sout.AppendFormat("SAR ");
-               sout.AppendLine();
-            }
+            //else if(g is GH_Surface)
+            //{
+            //   sout.AppendFormat("SAR ");
+            //   sout.AppendLine();
+            //}
             else
             {
                throw new ArgumentException("Encountered type not supported: " + g.GetType().ToString());

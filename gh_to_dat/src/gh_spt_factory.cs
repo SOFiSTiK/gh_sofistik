@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
+using Rhino;
+using Rhino.DocObjects;
 using Rhino.Geometry;
 
 namespace gh_sofistik
@@ -28,7 +30,7 @@ namespace gh_sofistik
    }
 
    // class implementing a GH_ container for Rhino.Geometry.Point
-   public class GH_StructuralPoint : GH_GeometricGoo<Point>, IGH_PreviewData
+   public class GH_StructuralPoint : GH_GeometricGoo<Point>, IGH_PreviewData, IGH_BakeAwareData
    {
       public int Id { get; set; } = 0;
       public Vector3d DirectionLocalX { get; set; } = new Vector3d();
@@ -122,6 +124,26 @@ namespace gh_sofistik
       {
          // no need to draw meshes 
       }
+
+      public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)
+      {
+         if(Value != null)
+         {
+            var att = baking_attributes.Duplicate();
+
+            att.SetUserString("SOF_OBJ_TYPE", "SPT");
+            att.SetUserString("SOF_ID", this.Id.ToString());
+            att.SetUserString("SOF_FIX", this.FixLiteral);
+            // TODO
+
+            obj_guid = doc.Objects.AddPoint(Value.Location, att);
+         }
+         else
+         {
+            obj_guid = new Guid();
+         }
+         return true;
+      }
    }
 
    // create structural point
@@ -141,10 +163,10 @@ namespace gh_sofistik
          var ids = new List<int>(); ids.Add(0);
 
          pManager.AddPointParameter("Point", "P", "List of Points", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Id", "Id", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local X", "Tx", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
-         pManager.AddVectorParameter("Local Z", "Tz", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
-         pManager.AddTextParameter("Fix", "Fix", "Support condition literal", GH_ParamAccess.item, string.Empty);
+         pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local X", "TX", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddVectorParameter("Local Z", "TZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
