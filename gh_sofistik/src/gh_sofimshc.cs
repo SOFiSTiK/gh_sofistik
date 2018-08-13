@@ -132,9 +132,13 @@ namespace gh_sofistik
                   id_string = string.Empty; // set only the 1st time
 
                   if (ga.MaterialId > 0)
-                     sb.AppendFormat(" MNR {0}", ga.MaterialId.ToString());
+                     sb.AppendFormat(" MNO {0}", ga.MaterialId.ToString());
                   if (ga.ReinforcementId > 0)
-                     sb.AppendFormat(" MBW {0}", ga.ReinforcementId.ToString());
+                     sb.AppendFormat(" MRF {0}", ga.ReinforcementId.ToString());
+                  if(ga.DirectionLocalX.Length > 1.0E-8)
+                  {
+                     sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", ga.DirectionLocalX.X, ga.DirectionLocalX.Y, ga.DirectionLocalX.Z);
+                  }
 
                   sb.AppendLine();
 
