@@ -18,6 +18,7 @@ namespace gh_sofistik
       public int MaterialId { get; set; } = 0;
       public int ReinforcementId { get; set; } = 0;
       public double Thickness { get; set; } = 0.0;
+      public Vector3d DirectionLocalX { get; set; } = new Vector3d();
 
       public override BoundingBox Boundingbox
       {
@@ -43,7 +44,8 @@ namespace gh_sofistik
             GroupId = this.GroupId,
             MaterialId = this.MaterialId,
             ReinforcementId = this.ReinforcementId,
-            Thickness = this.Thickness
+            Thickness = this.Thickness,
+            DirectionLocalX = this.DirectionLocalX
          };
       }
 
@@ -117,12 +119,28 @@ namespace gh_sofistik
          {
             var att = baking_attributes.Duplicate();
 
-            var str_id = this.Id > 0 ? Id.ToString() : string.Empty;
+            var id_str = this.Id > 0 ? Id.ToString() : "0"; 
+            var grp_str = this.GroupId.ToString();
+            var mno_str = this.MaterialId.ToString();
+            var mrf_str = this.ReinforcementId.ToString();
+            var t_str = this.Thickness.ToString();
 
             att.SetUserString("SOF_OBJ_TYPE", "SAR");
-            att.SetUserString("SOF_ID", str_id);
+            att.SetUserString("SOF_ID", id_str);
+            att.SetUserString("SOF_T", Thickness.ToString());
+            if(GroupId>0)
+               att.SetUserString("SOF_GRP", GroupId.ToString());
+            if (MaterialId > 0)
+               att.SetUserString("SOF_MNO", MaterialId.ToString());
+            if (ReinforcementId > 0)
+               att.SetUserString("SOF_MRF", ReinforcementId.ToString());
 
-            // TODO: add attributes
+            if(DirectionLocalX.Length > 1.0e-8)
+            {
+               att.SetUserString("SOF_DRX", DirectionLocalX.X.ToString("F6"));
+               att.SetUserString("SOF_DRX", DirectionLocalX.Y.ToString("F6"));
+               att.SetUserString("SOF_DRZ", DirectionLocalX.Z.ToString("F6"));
+            }
 
             obj_guid = doc.Objects.AddBrep(Value, att);
          }
@@ -150,17 +168,18 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddBrepParameter("Brep", "B", "List of Breps", GH_ParamAccess.list);
+         pManager.AddBrepParameter("Brep", "Brp", "List of Breps / Surfaces", GH_ParamAccess.list);
          pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("Group", "GRP", "Group membership", GH_ParamAccess.item, 0);
          pManager.AddNumberParameter("Thickness", "T", "Thickness of surface", GH_ParamAccess.item, 0.0);
          pManager.AddIntegerParameter("Material", "MNR", "Material of surface member", GH_ParamAccess.item, 0);
          pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement Material of surface member", GH_ParamAccess.item, 0);
+         pManager.AddVectorParameter("Local X", "DRX", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Brep", "B", "Brep with SOFiSTiK properties", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Brep", "Brp", "Breps / Surfaces with SOFiSTiK properties", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess DA)
@@ -172,6 +191,8 @@ namespace gh_sofistik
          int material_id = 0;
          int reinforcement_id = 0;
          double thickness = 0.0;
+         var local_x = new Vector3d();
+
 
          if (!DA.GetDataList(0, breps)) return;
          if (!DA.GetDataList(1, ids)) return;
@@ -179,6 +200,7 @@ namespace gh_sofistik
          if (!DA.GetData(3, ref thickness)) return;
          if (!DA.GetData(4, ref material_id)) return;
          if (!DA.GetData(5, ref reinforcement_id)) return;
+         if (!DA.GetData(6, ref local_x)) return;
 
          Utils.FillIdentifierList(ids, breps.Count);
 
@@ -195,7 +217,8 @@ namespace gh_sofistik
                GroupId = group_id,
                MaterialId = material_id,
                ReinforcementId = reinforcement_id,
-               Thickness = thickness
+               Thickness = thickness,
+               DirectionLocalX = local_x
             };
             gh_structural_areas.Add(ga);
          }

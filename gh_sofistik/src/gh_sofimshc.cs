@@ -27,7 +27,8 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddBooleanParameter("Create Mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
+         pManager.AddNumberParameter("Intersection tolerance", "TOLG", "Intersection tolerance", GH_ParamAccess.item, 0.01);
+         pManager.AddBooleanParameter("Create mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
          pManager.AddNumberParameter("Mesh density", "HMIN", "Allows to set the global mesh density in [m]", GH_ParamAccess.item, 1.0);
          pManager.AddTextParameter("Additional text input", "TXT", "Additional SOFiMSHC text input", GH_ParamAccess.item, string.Empty);
          pManager.AddGeometryParameter("Geometry", "G", "Collection of geometry objects", GH_ParamAccess.tree);
@@ -41,22 +42,25 @@ namespace gh_sofistik
 
       protected override void SolveInstance(IGH_DataAccess DA)
       {
+         double tolg = 0.01;
          bool mesh = true;
          double hmin = 1.0;
          string control_string = string.Empty;
          var geometry = new Grasshopper.Kernel.Data.GH_Structure<IGH_GeometricGoo>();
 
-         if (!DA.GetData(0, ref mesh)) return;
-         if (!DA.GetData(1, ref hmin)) return;
-         if (!DA.GetData(2, ref control_string)) return;
-         if (!DA.GetDataTree(3, out geometry)) return;
+         if (!DA.GetData(0, ref tolg)) return;
+         if (!DA.GetData(1, ref mesh)) return;
+         if (!DA.GetData(2, ref hmin)) return;
+         if (!DA.GetData(3, ref control_string)) return;
+         if (!DA.GetDataTree(4, out geometry)) return;
 
          var sb = new StringBuilder();
 
          sb.AppendLine("+PROG SOFIMSHC");
          sb.AppendLine("HEAD");
          sb.AppendLine("PAGE UNII 0"); // export always in SOFiSTiK database units
-         sb.AppendLine("CTRL 3D GDIR NEGZ GDIV -1000");
+         sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
+         sb.AppendFormat("CTRL TOLG {0:F6}\n", tolg);
          if(mesh)
          {
             sb.AppendLine("CTRL MESH 1");
@@ -145,14 +149,13 @@ namespace gh_sofistik
                      else
                         continue;
 
-                     sb.AppendFormat("SARB {0}", type);
-                     sb.AppendLine();
-
                      foreach(var tr in loop.Trims)
                      {
                         var ed = tr.Edge;
                         if (ed != null)
                         {
+                           sb.AppendFormat("SARB {0}", type);
+                           sb.AppendLine();
                            AppendCurveGeometry(sb, ed.EdgeCurve);
                         }
                      }
@@ -206,9 +209,20 @@ namespace gh_sofistik
          {
             var n = c as NurbsCurve;
 
+            double l = n.GetLength();
+            double k0 = n.Knots.First();
+            double kn = n.Knots.Last();
+
+            // re-parametrize knot vectors to length of curve
+            double scale = 1.0;
+            if(Math.Abs(kn-k0) > 1.0E-6)
+               scale = l / (kn - k0);
+
             for (int i = 0; i < n.Knots.Count; ++i)
             {
-               sb.AppendFormat("SLNN S {0:F6}", n.Knots[i]);
+               double si = (n.Knots[i] - k0) * scale;
+
+               sb.AppendFormat("SLNN S {0:F6}", si);
                if (i == 0)
                   sb.AppendFormat(" DEGR {0}", n.Degree);
                sb.AppendLine();

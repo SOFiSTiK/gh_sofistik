@@ -139,7 +139,7 @@ namespace gh_sofistik
          {
             var att = baking_attributes.Duplicate();
 
-            var str_id = this.Id > 0 ? Id.ToString() : string.Empty;
+            var str_id = this.Id > 0 ? Id.ToString() : "0"; // string.Empty;
 
             att.SetUserString("SOF_OBJ_TYPE", "SLN");
             att.SetUserString("SOF_ID", str_id);
@@ -155,7 +155,15 @@ namespace gh_sofistik
             }
             att.SetUserString("SOF_SDIV", "0.0");
 
-            // TODO: add attributes
+            if(DirectionLocalZ.Length > 1.0E-8)
+            {
+               att.SetUserString("SOF_DRX", DirectionLocalZ.X.ToString("F6"));
+               att.SetUserString("SOF_DRY", DirectionLocalZ.Y.ToString("F6"));
+               att.SetUserString("SOF_DRZ", DirectionLocalZ.Z.ToString("F6"));
+            }
+
+            if (string.IsNullOrEmpty(FixLiteral) == false)
+               att.SetUserString("SOF_FIX", FixLiteral);
 
             obj_guid = doc.Objects.AddCurve(Value, att);
          }
@@ -181,11 +189,11 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddCurveParameter("Curve", "C", "List of Curves", GH_ParamAccess.list);
+         pManager.AddCurveParameter("Curve", "Crv", "List of Curves", GH_ParamAccess.list);
          pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("Group", "GRP", "Group membership", GH_ParamAccess.item, 0);
          pManager.AddIntegerParameter("Section", "SNO", "Identifier of cross section", GH_ParamAccess.item, 0);
-         pManager.AddVectorParameter("Local Z", "TZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddVectorParameter("Local Z", "DRZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
          pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.item, string.Empty);
       }
 
@@ -201,14 +209,14 @@ namespace gh_sofistik
          var ids = new List<int>();
          int group_id = 0;
          int section_id = 0;
-         var zdir = new Vector3d();
+         var local_z = new Vector3d();
          string fix_literal = string.Empty;
 
          if (!DA.GetDataList(0, curves)) return;
          if (!DA.GetDataList(1, ids)) return;
          if (!DA.GetData(2, ref group_id)) return;
          if (!DA.GetData(3, ref section_id)) return;
-         if (!DA.GetData(4, ref zdir)) return;
+         if (!DA.GetData(4, ref local_z)) return;
          if (!DA.GetData(5, ref fix_literal)) return;
 
          Utils.FillIdentifierList(ids, curves.Count);
@@ -225,7 +233,7 @@ namespace gh_sofistik
                Id = ids[i],
                GroupId = group_id,
                SectionId = section_id,
-               DirectionLocalZ = zdir,
+               DirectionLocalZ = local_z,
                FixLiteral = fix_literal
             };
             gh_structural_curves.Add(gc);
