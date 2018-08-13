@@ -84,6 +84,10 @@ namespace gh_sofistik
                   return true;
                }
             }
+            else
+            {
+               throw new Exception("Unable to cast to type: " + typeof(Q).ToString());
+            }
          }
 
          target = default(Q);
@@ -135,9 +139,11 @@ namespace gh_sofistik
          {
             var att = baking_attributes.Duplicate();
 
+            var str_id = this.Id > 0 ? Id.ToString() : string.Empty;
+
             att.SetUserString("SOF_OBJ_TYPE", "SLN");
-            if(this.Id > 0)
-               att.SetUserString("SOF_ID", this.Id.ToString());
+            att.SetUserString("SOF_ID", str_id);
+
             if(this.GroupId > 0)
                att.SetUserString("SOF_GRP", this.GroupId.ToString());
             if(this.SectionId > 0)
