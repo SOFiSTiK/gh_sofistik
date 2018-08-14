@@ -18,4 +18,4 @@ The components SPT, SLN and SAR for generating SOFiSTiK structural entities also
 analytical properties will be transferred to Rhino and accessible by the SOFiSTiK Rhino Interface.
 This means, the geometry baked within Rhino could also be directly meshed and exported to a SOFiSTiK analytical model from there - 
 provided, of course, you have the SOFiSTiK Rhino Interface installed.
-See the e.g. the documentation of the Rhino Interface for further information: [](https://www.sofistik.de/documentation/2018/en/rhino_interface/index.html)
+See the e.g. the [Online Documentation of the Rhino Interface](https://www.sofistik.de/documentation/2018/en/rhino_interface/index.html) for further information. 
