@@ -179,70 +179,94 @@ namespace gh_sofistik
          da.SetData(0, sb.ToString());
       }
 
+      private void AppendCurveGeometry(StringBuilder sb, LineCurve l)
+      {
+         Point3d pa = l.Line.From;
+         Point3d pe = l.Line.To;
+
+         sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
+         sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
+         sb.AppendLine();
+      }
+
+      private void AppendCurveGeometry(StringBuilder sb, ArcCurve a)
+      {
+         Point3d pa = a.PointAtStart;
+         Point3d pe = a.PointAtEnd;
+         Point3d pm = a.Arc.Center;
+         Vector3d n = a.Arc.Plane.Normal;
+
+         sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
+         sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
+         sb.AppendFormat(" XM {0:F6} {1:F6} {2:F6} ", pm.X, pm.Y, pm.Z);
+         sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6} ", n.X, n.Y, n.Z);
+         sb.AppendLine();
+      }
+
+      private void AppendCurveGeometry(StringBuilder sb, NurbsCurve n)
+      {
+         double l = n.GetLength();
+         double k0 = n.Knots.First();
+         double kn = n.Knots.Last();
+
+         // re-parametrize knot vectors to length of curve
+         double scale = 1.0;
+         if (Math.Abs(kn - k0) > 1.0E-6)
+            scale = l / (kn - k0);
+
+         for (int i = 0; i < n.Knots.Count; ++i)
+         {
+            double si = (n.Knots[i] - k0) * scale;
+
+            sb.AppendFormat("SLNN S {0:F6}", si);
+            if (i == 0)
+               sb.AppendFormat(" DEGR {0}", n.Degree);
+            sb.AppendLine();
+         }
+
+         bool first = true;
+         foreach (var p in n.Points)
+         {
+            sb.AppendFormat("SLNP X {0:F6} {1:F6} {2:F6}", p.Location.X, p.Location.Y, p.Location.Z);
+            if (p.Weight != 1.0)
+            {
+               sb.AppendFormat(" W {0:F6}", p.Weight);
+            }
+            if (first)
+            {
+               sb.Append(" TYPE NURB");
+               first = false;
+            }
+            sb.AppendLine();
+         }
+      }
+
+
       private void AppendCurveGeometry(StringBuilder sb, Curve c)
       {
          if (c is LineCurve)
          {
-            var l = c as LineCurve;
-            Point3d pa = l.Line.From;
-            Point3d pe = l.Line.To;
-
-            sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
-            sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
-            sb.AppendLine();
+            AppendCurveGeometry(sb, c as LineCurve);
          }
          else if (c is ArcCurve)
          {
-            var a = c as ArcCurve;
-            Point3d pa = a.PointAtStart;
-            Point3d pe = a.PointAtEnd;
-            Point3d pm = a.Arc.Center;
-            Vector3d n = a.Arc.Plane.Normal;
-
-            sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
-            sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
-            sb.AppendFormat(" XM {0:F6} {1:F6} {2:F6} ", pm.X, pm.Y, pm.Z);
-            sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6} ", n.X, n.Y, n.Z);
-            sb.AppendLine();
+            AppendCurveGeometry(sb, c as ArcCurve);
          }
          else if (c is NurbsCurve)
          {
-            var n = c as NurbsCurve;
-
-            double l = n.GetLength();
-            double k0 = n.Knots.First();
-            double kn = n.Knots.Last();
-
-            // re-parametrize knot vectors to length of curve
-            double scale = 1.0;
-            if(Math.Abs(kn-k0) > 1.0E-6)
-               scale = l / (kn - k0);
-
-            for (int i = 0; i < n.Knots.Count; ++i)
-            {
-               double si = (n.Knots[i] - k0) * scale;
-
-               sb.AppendFormat("SLNN S {0:F6}", si);
-               if (i == 0)
-                  sb.AppendFormat(" DEGR {0}", n.Degree);
-               sb.AppendLine();
-            }
-
-            bool first = true;
-            foreach (var p in n.Points)
-            {
-               sb.AppendFormat("SLNP X {0:F6} {1:F6} {2:F6}", p.Location.X, p.Location.Y, p.Location.Z);
-               if (p.Weight != 1.0)
-               {
-                  sb.AppendFormat(" W {0:F6}", p.Weight);
-               }
-               if (first)
-               {
-                  sb.Append(" TYPE NURB");
-                  first = false;
-               }
-               sb.AppendLine();
-            }
+            AppendCurveGeometry(sb, c as NurbsCurve);
+         }
+         else if(c is PolylineCurve)
+         {
+            var n = (c as PolylineCurve).ToNurbsCurve();
+            if(n != null)
+               AppendCurveGeometry(sb, n);
+         }
+         else if(c is PolyCurve)
+         {
+            var n = (c as PolyCurve).ToNurbsCurve();
+            if (n != null)
+               AppendCurveGeometry(sb, n);
          }
          else
          {
