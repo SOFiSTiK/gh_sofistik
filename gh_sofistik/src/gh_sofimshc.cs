@@ -12,7 +12,7 @@ namespace gh_sofistik
    public class CreateSofimshcInput : GH_Component
    {
       public CreateSofimshcInput()
-         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK","Geometry")
+         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -40,19 +40,13 @@ namespace gh_sofistik
          pManager.AddTextParameter("File", "F", "SOFiMSHC input data", GH_ParamAccess.item);
       }
 
-      protected override void SolveInstance(IGH_DataAccess DA)
+      protected override void SolveInstance(IGH_DataAccess da)
       {
-         double tolg = 0.01;
-         bool mesh = true;
-         double hmin = 1.0;
-         string control_string = string.Empty;
-         var geometry = new Grasshopper.Kernel.Data.GH_Structure<IGH_GeometricGoo>();
-
-         if (!DA.GetData(0, ref tolg)) return;
-         if (!DA.GetData(1, ref mesh)) return;
-         if (!DA.GetData(2, ref hmin)) return;
-         if (!DA.GetData(3, ref control_string)) return;
-         if (!DA.GetDataTree(4, out geometry)) return;
+         double tolg = da.GetData<double>(0);
+         bool mesh = da.GetData<bool>(1);
+         double hmin = da.GetData<double>(2);
+         string ctrl = da.GetData<string>(3);
+         var geometry = da.GetDataTree<IGH_GeometricGoo>(4);
 
          var sb = new StringBuilder();
 
@@ -68,8 +62,8 @@ namespace gh_sofistik
          }
 
          // add control string
-         if(!string.IsNullOrEmpty(control_string))
-            sb.Append(control_string);
+         if(!string.IsNullOrEmpty(ctrl))
+            sb.Append(ctrl);
          sb.AppendLine();
 
          // write structural lines
@@ -101,8 +95,10 @@ namespace gh_sofistik
                var gc = g as GH_StructuralLine;
 
                string id_string = gc.Id > 0 ? gc.Id.ToString() : "-";
+               string id_group = gc.GroupId > 0 ? gc.GroupId.ToString() : "-";
+               string id_section = gc.SectionId > 0 ? gc.SectionId.ToString() : "-";
 
-               sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, gc.GroupId, gc.SectionId);
+               sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, id_group, id_section);
 
                if (gc.DirectionLocalZ.Length > 0.0)
                   sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", gc.DirectionLocalZ.X, gc.DirectionLocalZ.Y, gc.DirectionLocalZ.Z);
@@ -180,7 +176,7 @@ namespace gh_sofistik
          sb.AppendLine();
          sb.AppendLine("END");
 
-         DA.SetData(0, sb.ToString());
+         da.SetData(0, sb.ToString());
       }
 
       private void AppendCurveGeometry(StringBuilder sb, Curve c)

@@ -12,23 +12,6 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   public class Utils
-   {
-      public static void FillIdentifierList(List<int> ids, int Size)
-      {
-         if (ids.Count == 0 || ids.First() == 0)
-         {
-            while (ids.Count < Size)
-               ids.Add(0);
-         }
-         else
-         {
-            while (ids.Count < Size)
-               ids.Add(ids.Last() + 1);
-         }
-      }
-   }
-
    // class implementing a GH_ container for Rhino.Geometry.Point
    public class GH_StructuralPoint : GH_GeometricGoo<Point>, IGH_PreviewData, IGH_BakeAwareData
    {
@@ -150,7 +133,7 @@ namespace gh_sofistik
    public class CreateStructuralPoint : GH_Component
    {
       public CreateStructuralPoint()
-         : base("SPT", "SPT", "Create SOFiSTiK Structural Points", "SOFiSTiK", "Geometry")
+         : base("SPT", "SPT", "Create SOFiSTiK Structural Points", "SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -163,9 +146,9 @@ namespace gh_sofistik
          var ids = new List<int>(); ids.Add(0);
 
          pManager.AddPointParameter("Point", "P", "List of Points", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local X", "TX", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
-         pManager.AddVectorParameter("Local Z", "TZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddIntegerParameter("Number", "NO", "Identifiers", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local X", "TX", "Directions of local x-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddVectorParameter("Local Z", "TZ", "Directions of local z-axis", GH_ParamAccess.item, new Vector3d());
          pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.item, string.Empty);
       }
 
@@ -174,22 +157,13 @@ namespace gh_sofistik
          pManager.AddGeometryParameter("Point", "P", "Point with SOFiSTiK properties", GH_ParamAccess.list);
       }
 
-      protected override void SolveInstance(IGH_DataAccess DA)
+      protected override void SolveInstance(IGH_DataAccess da)
       {
-         var points = new List<Point3d>();
-
-         var ids = new List<int>();
-         var sx = new Vector3d();
-         var sz = new Vector3d();
-         string fix_literal = string.Empty;
-
-         if (!DA.GetDataList(0, points)) return;
-         if (!DA.GetDataList(1, ids)) return;
-         if (!DA.GetData(2, ref sx)) return;
-         if (!DA.GetData(3, ref sz)) return;
-         if (!DA.GetData(4, ref fix_literal)) return;
-
-         Utils.FillIdentifierList(ids, points.Count);
+         var points = da.GetDataList<Point3d>(0);
+         var identifiers = da.GetDataList<int>(1);
+         var xdirs = da.GetDataList<Vector3d>(2);
+         var zdirs = da.GetDataList<Vector3d>(3);
+         var fixations = da.GetDataList<string>(4);
 
          var gh_structural_points = new List<GH_StructuralPoint>();
 
@@ -200,30 +174,15 @@ namespace gh_sofistik
             var gp = new GH_StructuralPoint()
             {
                Value = new Point(p3d),
-               Id = ids[i],
-               DirectionLocalX = sx,
-               DirectionLocalZ = sz,
-               FixLiteral = fix_literal
+               Id = identifiers.GetItemOrCountUp(i),
+               DirectionLocalX = xdirs.GetItemOrLast(i),
+               DirectionLocalZ = zdirs.GetItemOrLast(i),
+               FixLiteral = fixations.GetItemOrLast(i)
             };
             gh_structural_points.Add(gp);
          }
 
-         DA.SetDataList(0, gh_structural_points);
-
-         //var geometry_points = new List<Point>();
-
-         //for(int i=0; i<points.Count; ++i)
-         //{
-         //   var p3 = points[i];
-
-         //   var p = new Point(p3);
-         //   p.SetUserString("SOF_ID", ids[i].ToString());
-         //   p.SetUserString("SOF_SPT_FIX", fix_literal);
-
-         //   geometry_points.Add(p);
-         //}
-
-         //DA.SetDataList(0, geometry_points);
+         da.SetDataList(0, gh_structural_points);
       }
 
       public override Guid ComponentGuid

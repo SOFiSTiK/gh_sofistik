@@ -158,7 +158,7 @@ namespace gh_sofistik
    public class CreateStructuralArea : GH_Component
    {
       public CreateStructuralArea()
-         : base("SAR","SAR","Create SOFiSTiK Structural Area","SOFiSTiK", "Geometry")
+         : base("SAR","SAR","Create SOFiSTiK Structural Area","SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -169,12 +169,12 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddBrepParameter("Brep", "Brp", "List of Breps / Surfaces", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Group membership", GH_ParamAccess.item, 0);
-         pManager.AddNumberParameter("Thickness", "T", "Thickness of surface", GH_ParamAccess.item, 0.0);
-         pManager.AddIntegerParameter("Material", "MNR", "Material of surface member", GH_ParamAccess.item, 0);
-         pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement Material of surface member", GH_ParamAccess.item, 0);
-         pManager.AddVectorParameter("Local X", "DRX", "Direction of local x-axis", GH_ParamAccess.item, new Vector3d());
+         pManager.AddIntegerParameter("Number", "NO", "List of Ids", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "GRP", "Groups", GH_ParamAccess.list, 0);
+         pManager.AddNumberParameter("Thickness", "T", "Thickness of surfaces/breps", GH_ParamAccess.list, 0.0);
+         pManager.AddIntegerParameter("Material", "MNR", "Material numbers", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement Material numbers", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local X", "DRX", "Directions of local x-axis", GH_ParamAccess.list, new Vector3d());
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -182,27 +182,15 @@ namespace gh_sofistik
          pManager.AddGeometryParameter("Brep", "Brp", "Breps / Surfaces with SOFiSTiK properties", GH_ParamAccess.list);
       }
 
-      protected override void SolveInstance(IGH_DataAccess DA)
+      protected override void SolveInstance(IGH_DataAccess da)
       {
-         var breps = new List<Brep>();
-
-         var ids = new List<int>();
-         int group_id = 0;
-         int material_id = 0;
-         int reinforcement_id = 0;
-         double thickness = 0.0;
-         var local_x = new Vector3d();
-
-
-         if (!DA.GetDataList(0, breps)) return;
-         if (!DA.GetDataList(1, ids)) return;
-         if (!DA.GetData(2, ref group_id)) return;
-         if (!DA.GetData(3, ref thickness)) return;
-         if (!DA.GetData(4, ref material_id)) return;
-         if (!DA.GetData(5, ref reinforcement_id)) return;
-         if (!DA.GetData(6, ref local_x)) return;
-
-         Utils.FillIdentifierList(ids, breps.Count);
+         var breps = da.GetDataList<Brep>(0);
+         var ids = da.GetDataList<int>(1);
+         var groups = da.GetDataList<int>(2);
+         var thicknss = da.GetDataList<double>(3);
+         var materials = da.GetDataList<int>(4);
+         var matreinfs = da.GetDataList<int>(5);
+         var xdirs = da.GetDataList<Vector3d>(6);
 
          var gh_structural_areas = new List<GH_StructuralArea>();
 
@@ -213,17 +201,17 @@ namespace gh_sofistik
             var ga = new GH_StructuralArea()
             {
                Value = b,
-               Id = ids[i],
-               GroupId = group_id,
-               MaterialId = material_id,
-               ReinforcementId = reinforcement_id,
-               Thickness = thickness,
-               DirectionLocalX = local_x
+               Id = ids.GetItemOrCountUp(i),
+               GroupId = groups.GetItemOrLast(i),
+               MaterialId = materials.GetItemOrLast(i),
+               ReinforcementId = matreinfs.GetItemOrLast(i),
+               Thickness = thicknss.GetItemOrLast(i),
+               DirectionLocalX = xdirs.GetItemOrLast(i)
             };
             gh_structural_areas.Add(ga);
          }
 
-         DA.SetDataList(0, gh_structural_areas);
+         da.SetDataList(0, gh_structural_areas);
       }
 
       public override Guid ComponentGuid

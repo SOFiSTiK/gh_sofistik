@@ -179,7 +179,7 @@ namespace gh_sofistik
    public class CreateStructuralLine : GH_Component
    {
       public CreateStructuralLine()
-         : base("SLN","SLN","Create SOFiSTiK Structural Lines","SOFiSTiK","Geometry")
+         : base("SLN","SLN","Create SOFiSTiK Structural Lines","SOFiSTiK", "Structure")
       {}
 
       protected override System.Drawing.Bitmap Icon
@@ -190,11 +190,11 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddCurveParameter("Curve", "Crv", "List of Curves", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number(s)", "NO", "List of Ids (or start Id if only one given)", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Group membership", GH_ParamAccess.item, 0);
-         pManager.AddIntegerParameter("Section", "SNO", "Identifier of cross section", GH_ParamAccess.item, 0);
-         pManager.AddVectorParameter("Local Z", "DRZ", "Direction of local z-axis", GH_ParamAccess.item, new Vector3d());
-         pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.item, string.Empty);
+         pManager.AddIntegerParameter("Number", "NO", "List of Ids", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "GRP", "Groups", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Section", "SNO", "Identifiers of cross section", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local Z", "DRZ", "Directions of local z-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddTextParameter("Fixation", "FIX", "Support conditions", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -202,24 +202,14 @@ namespace gh_sofistik
          pManager.AddGeometryParameter("Curve", "C", "Curve with SOFiSTiK properties", GH_ParamAccess.list);
       }
 
-      protected override void SolveInstance(IGH_DataAccess DA)
+      protected override void SolveInstance(IGH_DataAccess da)
       {
-         var curves = new List<Curve>();
-
-         var ids = new List<int>();
-         int group_id = 0;
-         int section_id = 0;
-         var local_z = new Vector3d();
-         string fix_literal = string.Empty;
-
-         if (!DA.GetDataList(0, curves)) return;
-         if (!DA.GetDataList(1, ids)) return;
-         if (!DA.GetData(2, ref group_id)) return;
-         if (!DA.GetData(3, ref section_id)) return;
-         if (!DA.GetData(4, ref local_z)) return;
-         if (!DA.GetData(5, ref fix_literal)) return;
-
-         Utils.FillIdentifierList(ids, curves.Count);
+         var curves = da.GetDataList<Curve>(0);
+         var identifiers = da.GetDataList<int>(1);
+         var groups = da.GetDataList<int>(2);
+         var sections = da.GetDataList<int>(3);
+         var zdirs = da.GetDataList<Vector3d>(4);
+         var fixations = da.GetDataList<string>(5); 
 
          var gh_structural_curves = new List<GH_StructuralLine>();
 
@@ -230,16 +220,16 @@ namespace gh_sofistik
             var gc = new GH_StructuralLine()
             {
                Value = c,
-               Id = ids[i],
-               GroupId = group_id,
-               SectionId = section_id,
-               DirectionLocalZ = local_z,
-               FixLiteral = fix_literal
+               Id = identifiers.GetItemOrCountUp(i),
+               GroupId = groups.GetItemOrLast(i),
+               SectionId = sections.GetItemOrLast(i),
+               DirectionLocalZ = zdirs.GetItemOrLast(i),
+               FixLiteral = fixations.GetItemOrLast(i)
             };
             gh_structural_curves.Add(gc);
          }
 
-         DA.SetDataList(0, gh_structural_curves);
+         da.SetDataList(0, gh_structural_curves);
       }
 
       public override Guid ComponentGuid
