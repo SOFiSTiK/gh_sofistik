@@ -12,7 +12,7 @@ namespace gh_sofistik
    public class CreateSofimshcInput : GH_Component
    {
       public CreateSofimshcInput()
-         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Structure")
+         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Geometry")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -31,7 +31,7 @@ namespace gh_sofistik
          pManager.AddBooleanParameter("Create mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
          pManager.AddNumberParameter("Mesh density", "HMIN", "Allows to set the global mesh density in [m]", GH_ParamAccess.item, 1.0);
          pManager.AddTextParameter("Additional text input", "TXT", "Additional SOFiMSHC text input", GH_ParamAccess.item, string.Empty);
-         pManager.AddGeometryParameter("Geometry", "G", "Collection of geometry objects", GH_ParamAccess.tree);
+         pManager.AddGeometryParameter("Structural Elements", "G", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
 
       }
 
@@ -46,7 +46,15 @@ namespace gh_sofistik
          bool mesh = da.GetData<bool>(1);
          double hmin = da.GetData<double>(2);
          string ctrl = da.GetData<string>(3);
-         var geometry = da.GetDataTree<IGH_GeometricGoo>(4);
+
+         var structural_elements = new List<IGS_StructuralElement>();
+         foreach( var it in da.GetDataList<IGH_Goo>(4))
+         {
+            if (it is IGS_StructuralElement)
+               structural_elements.Add(it as IGS_StructuralElement);
+            else
+               AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_StructuralElement.");
+         }
 
          var sb = new StringBuilder();
 
@@ -67,58 +75,58 @@ namespace gh_sofistik
          sb.AppendLine();
 
          // write structural lines
-         foreach( var g in geometry )
+         foreach( var se in structural_elements )
          {
-            if(g is GH_StructuralPoint)
+            if(se is GS_StructuralPoint)
             {
-               var gp = g as GH_StructuralPoint;
-               Point3d p = gp.Value.Location;
+               var spt = se as GS_StructuralPoint;
+               Point3d p = spt.Value.Location;
 
-               string id_string = gp.Id > 0 ? gp.Id.ToString() : "-";
+               string id_string = spt.Id > 0 ? spt.Id.ToString() : "-";
 
                sb.AppendFormat("SPT {0} X {1:F6} {2:F6} {3:F6}",id_string, p.X, p.Y, p.Z);
 
-               if (gp.DirectionLocalX.Length > 0.0)
-                  sb.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", gp.DirectionLocalX.X, gp.DirectionLocalX.Y, gp.DirectionLocalX.Z);
+               if (spt.DirectionLocalX.Length > 0.0)
+                  sb.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalX.X, spt.DirectionLocalX.Y, spt.DirectionLocalX.Z);
 
-               if (gp.DirectionLocalZ.Length > 0.0)
-                  sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6}", gp.DirectionLocalZ.X, gp.DirectionLocalZ.Y, gp.DirectionLocalZ.Z);
+               if (spt.DirectionLocalZ.Length > 0.0)
+                  sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalZ.X, spt.DirectionLocalZ.Y, spt.DirectionLocalZ.Z);
 
-               if (string.IsNullOrWhiteSpace(gp.FixLiteral) == false)
-                  sb.AppendFormat(" FIX {0}", gp.FixLiteral);
+               if (string.IsNullOrWhiteSpace(spt.FixLiteral) == false)
+                  sb.AppendFormat(" FIX {0}", spt.FixLiteral);
 
                sb.AppendLine();
             }
             // write structural lines
-            else if(g is GH_StructuralLine)
+            else if(se is GS_StructuralLine)
             {
-               var gc = g as GH_StructuralLine;
+               var sln = se as GS_StructuralLine;
 
-               string id_string = gc.Id > 0 ? gc.Id.ToString() : "-";
-               string id_group = gc.GroupId > 0 ? gc.GroupId.ToString() : "-";
-               string id_section = gc.SectionId > 0 ? gc.SectionId.ToString() : "-";
+               string id_string = sln.Id > 0 ? sln.Id.ToString() : "-";
+               string id_group = sln.GroupId > 0 ? sln.GroupId.ToString() : "-";
+               string id_section = sln.SectionId > 0 ? sln.SectionId.ToString() : "-";
 
                sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, id_group, id_section);
 
-               if (gc.DirectionLocalZ.Length > 0.0)
-                  sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", gc.DirectionLocalZ.X, gc.DirectionLocalZ.Y, gc.DirectionLocalZ.Z);
+               if (sln.DirectionLocalZ.Length > 0.0)
+                  sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sln.DirectionLocalZ.X, sln.DirectionLocalZ.Y, sln.DirectionLocalZ.Z);
 
-               if (string.IsNullOrWhiteSpace(gc.FixLiteral) == false)
-                  sb.AppendFormat(" FIX {0}", gc.FixLiteral);
+               if (string.IsNullOrWhiteSpace(sln.FixLiteral) == false)
+                  sb.AppendFormat(" FIX {0}", sln.FixLiteral);
 
                sb.AppendLine();
 
-               AppendCurveGeometry(sb, gc.Value);
+               AppendCurveGeometry(sb, sln.Value);
             }
             // write structural areas
-            else if (g is GH_StructuralArea)
+            else if (se is GS_StructuralArea)
             {
-               var ga = g as GH_StructuralArea;
-               var brep = ga.Value;
+               var sar = se as GS_StructuralArea;
+               var brep = sar.Value;
 
-               string id_string = ga.Id > 0 ? ga.Id.ToString() : "-";
-               string grp_string = ga.GroupId > 0 ? ga.GroupId.ToString() : "-";
-               string thk_string = ga.Thickness.ToString("F6");
+               string id_string = sar.Id > 0 ? sar.Id.ToString() : "-";
+               string grp_string = sar.GroupId > 0 ? sar.GroupId.ToString() : "-";
+               string thk_string = sar.Thickness.ToString("F6");
 
                foreach( var fc in brep.Faces)
                {
@@ -127,13 +135,13 @@ namespace gh_sofistik
                   sb.AppendFormat("SAR {0} GRP {1} T {2}", id_string, grp_string, thk_string);
                   id_string = string.Empty; // set only the 1st time
 
-                  if (ga.MaterialId > 0)
-                     sb.AppendFormat(" MNO {0}", ga.MaterialId.ToString());
-                  if (ga.ReinforcementId > 0)
-                     sb.AppendFormat(" MRF {0}", ga.ReinforcementId.ToString());
-                  if(ga.DirectionLocalX.Length > 1.0E-8)
+                  if (sar.MaterialId > 0)
+                     sb.AppendFormat(" MNO {0}", sar.MaterialId.ToString());
+                  if (sar.ReinforcementId > 0)
+                     sb.AppendFormat(" MRF {0}", sar.ReinforcementId.ToString());
+                  if(sar.DirectionLocalX.Length > 1.0E-8)
                   {
-                     sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", ga.DirectionLocalX.X, ga.DirectionLocalX.Y, ga.DirectionLocalX.Z);
+                     sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sar.DirectionLocalX.X, sar.DirectionLocalX.Y, sar.DirectionLocalX.Z);
                   }
 
                   sb.AppendLine();
@@ -170,7 +178,7 @@ namespace gh_sofistik
             }
             else
             {
-               AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Encountered type not supported: " + g.GetType().ToString());
+               AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unsupported type encountered: " + se.TypeName);
             }
          }
          sb.AppendLine();

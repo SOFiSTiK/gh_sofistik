@@ -63,8 +63,11 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="src\gh_helper.cs" />
+    <Compile Include="src\gs_line_load.cs" />
+    <Compile Include="src\gs_point_load.cs" />
     <Compile Include="src\gh_sar_factory.cs" />
     <Compile Include="src\gh_sln_factory.cs" />
+    <Compile Include="src\gs_sofiload.cs" />
     <Compile Include="src\gh_sofimshc.cs" />
     <Compile Include="src\gh_spt_factory.cs" />
   </ItemGroup>

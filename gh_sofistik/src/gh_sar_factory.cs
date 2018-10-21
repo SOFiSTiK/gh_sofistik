@@ -11,7 +11,7 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   public class GH_StructuralArea : GH_GeometricGoo<Brep>, IGH_PreviewData, IGH_BakeAwareData
+   public class GS_StructuralArea : GH_GeometricGoo<Brep>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
    {
       public int Id { get; set; } = 0;
       public int GroupId { get; set; } = 0;
@@ -32,12 +32,17 @@ namespace gh_sofistik
 
       public override string TypeName
       {
-         get { return "GH_StructuralArea"; }
+         get { return "GS_StructuralArea"; }
+      }
+
+      public override string ToString()
+      {
+         return TypeName; // TODO: add some more information?
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
       {
-         return new GH_StructuralArea()
+         return new GS_StructuralArea()
          {
             Value = this.Value.DuplicateBrep(),
             Id = this.Id,
@@ -76,7 +81,7 @@ namespace gh_sofistik
 
       public override IGH_GeometricGoo Morph(SpaceMorph xmorph)
       {
-         var dup = this.DuplicateGeometry() as GH_StructuralArea;
+         var dup = this.DuplicateGeometry() as GS_StructuralArea;
          xmorph.Morph(dup.Value);
 
          return dup;
@@ -84,15 +89,10 @@ namespace gh_sofistik
 
       public override IGH_GeometricGoo Transform(Transform xform)
       {
-         var dup = this.DuplicateGeometry() as GH_StructuralArea;
+         var dup = this.DuplicateGeometry() as GS_StructuralArea;
          dup.Value.Transform(xform);
 
          return dup;
-      }
-
-      public override string ToString()
-      {
-         return Value.ToString(); // TODO: add some more information?
       }
 
       public BoundingBox ClippingBox
@@ -158,7 +158,7 @@ namespace gh_sofistik
    public class CreateStructuralArea : GH_Component
    {
       public CreateStructuralArea()
-         : base("SAR","SAR","Create SOFiSTiK Structural Area","SOFiSTiK", "Structure")
+         : base("SAR","SAR","Creates SOFiSTiK Structural Areas","SOFiSTiK", "Geometry")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -169,17 +169,17 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddBrepParameter("Brep", "Brp", "List of Breps / Surfaces", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number", "NO", "List of Ids", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Groups", GH_ParamAccess.list, 0);
-         pManager.AddNumberParameter("Thickness", "T", "Thickness of surfaces/breps", GH_ParamAccess.list, 0.0);
+         pManager.AddIntegerParameter("Area number", "NO", "Identifiers of structural areas", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "GRP", "Group numbers", GH_ParamAccess.list, 0);
+         pManager.AddNumberParameter("Thickness", "T", "Thickness of structural areas", GH_ParamAccess.list, 0.0);
          pManager.AddIntegerParameter("Material", "MNR", "Material numbers", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement Material numbers", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local X", "DRX", "Directions of local x-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement material numbers", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Local X", "DRX", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Brep", "Brp", "Breps / Surfaces with SOFiSTiK properties", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Area", "A", "SOFiSTiK Structural Area", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -192,13 +192,13 @@ namespace gh_sofistik
          var matreinfs = da.GetDataList<int>(5);
          var xdirs = da.GetDataList<Vector3d>(6);
 
-         var gh_structural_areas = new List<GH_StructuralArea>();
+         var gh_structural_areas = new List<GS_StructuralArea>();
 
          for(int i=0; i<breps.Count; ++i)
          {
             var b = breps[i];
 
-            var ga = new GH_StructuralArea()
+            var ga = new GS_StructuralArea()
             {
                Value = b,
                Id = ids.GetItemOrCountUp(i),

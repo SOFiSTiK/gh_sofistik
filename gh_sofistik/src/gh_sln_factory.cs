@@ -12,7 +12,7 @@ using Rhino.Geometry;
 namespace gh_sofistik
 {
    // class implementing a GH_ container for Rhino.Geometry.Curve
-   public class GH_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData, IGH_BakeAwareData
+   public class GS_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
    {
       public int Id { get; set; } = 0;
       public int GroupId { get; set; } = 0;    
@@ -32,12 +32,17 @@ namespace gh_sofistik
 
       public override string TypeName
       {
-         get { return "GH_StructuralLine"; }
+         get { return "GS_StructuralLine"; }
+      }
+
+      public override string ToString()
+      {
+         return TypeName;
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
       {
-         return new GH_StructuralLine()
+         return new GS_StructuralLine()
          {
             Value = this.Value.DuplicateCurve(),
             Id = this.Id,
@@ -55,48 +60,12 @@ namespace gh_sofistik
 
       public override bool CastTo<Q>(out Q target)
       {
-         if (Value != null)
-         {
-            // cast to GH_Curve (Caution: this loses all structural information)
-            if (typeof(Q).IsAssignableFrom(typeof(GH_Curve)))
-            {
-               var gc = new GH_Curve(this.Value);
-               target = (Q)(object)gc;
-               return true;
-            }
-            // cast to GH_Line (Caution: this loses all structural information)
-            else if (typeof(Q).IsAssignableFrom(typeof(GH_Line)))
-            {
-               if (this.Value is LineCurve)
-               {
-                  var gl = new GH_Line((Value as LineCurve).Line);
-                  target = (Q)(object)gl;
-                  return true;
-               }
-            }
-            // cast to GH_Arc (Caution: this loses all structural information)
-            else if (typeof(Q).IsAssignableFrom(typeof(GH_Arc)))
-            {
-               if(this.Value is ArcCurve)
-               {
-                  var ga = new GH_Arc((Value as ArcCurve).Arc);
-                  target = (Q)(object)ga;
-                  return true;
-               }
-            }
-            else
-            {
-               throw new Exception("Unable to cast to type: " + typeof(Q).ToString());
-            }
-         }
-
-         target = default(Q);
-         return false;
+         return Util.CastCurveTo(this.Value, out target);
       }
 
       public override IGH_GeometricGoo Morph(SpaceMorph xmorph)
       {
-         var dup = this.DuplicateGeometry() as GH_StructuralLine;
+         var dup = this.DuplicateGeometry() as GS_StructuralLine;
          xmorph.Morph(dup.Value);
 
          return dup;
@@ -104,15 +73,10 @@ namespace gh_sofistik
 
       public override IGH_GeometricGoo Transform(Transform xform)
       {
-         var dup = this.DuplicateGeometry() as GH_StructuralLine;
+         var dup = this.DuplicateGeometry() as GS_StructuralLine;
          dup.Value.Transform(xform);
 
          return dup;
-      }
-
-      public override string ToString()
-      {
-         return Value.ToString();
       }
 
       public BoundingBox ClippingBox
@@ -179,7 +143,7 @@ namespace gh_sofistik
    public class CreateStructuralLine : GH_Component
    {
       public CreateStructuralLine()
-         : base("SLN","SLN","Create SOFiSTiK Structural Lines","SOFiSTiK", "Structure")
+         : base("SLN","SLN","Creates SOFiSTiK Structural Lines","SOFiSTiK", "Geometry")
       {}
 
       protected override System.Drawing.Bitmap Icon
@@ -190,16 +154,16 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddCurveParameter("Curve", "Crv", "List of Curves", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number", "NO", "List of Ids", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Groups", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Number", "NO", "Identifiers of structural lines", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "GRP", "Group numbers of structural lines", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("Section", "SNO", "Identifiers of cross section", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local Z", "DRZ", "Directions of local z-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Local Z", "DRZ", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddTextParameter("Fixation", "FIX", "Support conditions", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Curve", "C", "Curve with SOFiSTiK properties", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Line", "L", "SOFiSTiK Structural Line", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -211,13 +175,13 @@ namespace gh_sofistik
          var zdirs = da.GetDataList<Vector3d>(4);
          var fixations = da.GetDataList<string>(5); 
 
-         var gh_structural_curves = new List<GH_StructuralLine>();
+         var gh_structural_curves = new List<GS_StructuralLine>();
 
          for( int i=0; i<curves.Count; ++i)
          {
             var c = curves[i];
 
-            var gc = new GH_StructuralLine()
+            var gc = new GS_StructuralLine()
             {
                Value = c,
                Id = identifiers.GetItemOrCountUp(i),
