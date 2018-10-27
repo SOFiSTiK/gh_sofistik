@@ -38,7 +38,7 @@ namespace gh_sofistik
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("File", "F", "SOFiMSHC input data", GH_ParamAccess.item);
+         pManager.AddTextParameter("File", "F", "SOFiLOAD input data", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

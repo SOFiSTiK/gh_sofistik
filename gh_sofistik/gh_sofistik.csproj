@@ -48,13 +48,11 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\img_structural_line.png" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\Resources.Designer.cs">
@@ -62,6 +60,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="src\gh_calculate.cs" />
     <Compile Include="src\gh_helper.cs" />
     <Compile Include="src\gs_line_load.cs" />
     <Compile Include="src\gs_point_load.cs" />
@@ -85,13 +84,40 @@
     <None Include="src\img\structural_point16.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\structural_area16.png" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="src\img\structural_area16.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\img\sofistik_32x32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\animator24.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\winps24.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resources\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\1_Teddy_Icon_16x16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\animator16.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\folder-open-icon 16x16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\wps.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\animator.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\teddy 16x16.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\animator 16x16.bmp" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
