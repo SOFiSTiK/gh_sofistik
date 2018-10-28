@@ -19,3 +19,8 @@ analytical properties will be transferred to Rhino accessible by the SOFiSTiK Rh
 This means, the geometry baked within Rhino can be further edited and meshed to a SOFiSTiK analytical model from there - 
 provided, of course, you have the SOFiSTiK Rhino Interface installed.
 See the e.g. the [Online Documentation of the Rhino Interface](https://www.sofistik.de/documentation/2018/en/rhino_interface/index.html) for further information. 
+
+Please note: the grasshopper assembly is continuously being developed and at this stage we cannot guarantee that, e.g.
+node and parameter names may not change. However these changes mainly take place in the master branch.
+For productive usage, we recommend to switch to a stable branch, available in parallel to the master, and to download the 
+gha assembly from there. Stable branches may receive fixes on request but will not undergo larger changes.
