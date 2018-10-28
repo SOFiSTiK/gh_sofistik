@@ -84,7 +84,7 @@ namespace gh_sofistik
 
                string id_string = spt.Id > 0 ? spt.Id.ToString() : "-";
 
-               sb.AppendFormat("SPT {0} X {1:F6} {2:F6} {3:F6}",id_string, p.X, p.Y, p.Z);
+               sb.AppendFormat("SPT {0} X {1:F8} {2:F8} {3:F8}",id_string, p.X, p.Y, p.Z);
 
                if (spt.DirectionLocalX.Length > 0.0)
                   sb.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalX.X, spt.DirectionLocalX.Y, spt.DirectionLocalX.Z);
@@ -128,8 +128,22 @@ namespace gh_sofistik
                string grp_string = sar.GroupId > 0 ? sar.GroupId.ToString() : "-";
                string thk_string = sar.Thickness.ToString("F6");
 
+               // some preparations
+               brep.CullUnusedSurfaces();
+               brep.CullUnusedFaces();
+               brep.CullUnusedEdges();
+
+               // loop over all faces within the brep
                foreach( var fc in brep.Faces)
                {
+                  // checks and preparations
+                  fc.ShrinkFace(BrepFace.ShrinkDisableSide.ShrinkAllSides);
+
+                  if(fc.IsClosed(0) || fc.IsClosed(1))
+                  {
+                     this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "A given Surface is closed in one direction.\nSuch surfaces cannot be handled by SOFiMSHC and need to be split.");
+                  }
+
                   // write SAR header
                   sb.AppendLine();
                   sb.AppendFormat("SAR {0} GRP {1} T {2}", id_string, grp_string, thk_string);
@@ -147,32 +161,12 @@ namespace gh_sofistik
                   sb.AppendLine();
 
                   // outer boundary
-                  foreach( var loop in fc.Loops)
-                  {
-                     string type;
-                     if (loop.LoopType == BrepLoopType.Outer)
-                        type = "OUT";
-                     else if (loop.LoopType == BrepLoopType.Inner)
-                        type = "IN";
-                     else
-                        continue;
-
-                     foreach(var tr in loop.Trims)
-                     {
-                        var ed = tr.Edge;
-                        if (ed != null)
-                        {
-                           sb.AppendFormat("SARB {0}", type);
-                           sb.AppendLine();
-                           AppendCurveGeometry(sb, ed.EdgeCurve);
-                        }
-                     }
-                  }
+                  AppendSurfaceBoundary(sb, fc);
 
                   // write geometry
                   if(fc.IsPlanar() == false)
                   {
-                     AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Curved surfaces currently not supported");
+                     AppendSurfaceGeometry(sb, fc.ToNurbsSurface());
                   }
                }
             }
@@ -187,13 +181,14 @@ namespace gh_sofistik
          da.SetData(0, sb.ToString());
       }
 
+      #region CURVE GEOMETRY
       private void AppendCurveGeometry(StringBuilder sb, LineCurve l)
       {
          Point3d pa = l.Line.From;
          Point3d pe = l.Line.To;
 
-         sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
-         sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
+         sb.AppendFormat(" SLNB X1 {0:F8} {1:F8} {2:F8} ", pa.X, pa.Y, pa.Z);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} ", pe.X, pe.Y, pe.Z);
          sb.AppendLine();
       }
 
@@ -204,51 +199,62 @@ namespace gh_sofistik
          Point3d pm = a.Arc.Center;
          Vector3d n = a.Arc.Plane.Normal;
 
-         sb.AppendFormat("SLNB X1 {0:F6} {1:F6} {2:F6} ", pa.X, pa.Y, pa.Z);
-         sb.AppendFormat(" X2 {0:F6} {1:F6} {2:F6} ", pe.X, pe.Y, pe.Z);
-         sb.AppendFormat(" XM {0:F6} {1:F6} {2:F6} ", pm.X, pm.Y, pm.Z);
-         sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6} ", n.X, n.Y, n.Z);
+         sb.AppendFormat(" SLNB X1 {0:F8} {1:F8} {2:F8} ", pa.X, pa.Y, pa.Z);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} ", pe.X, pe.Y, pe.Z);
+         sb.AppendFormat(" XM {0:F8} {1:F8} {2:F8} ", pm.X, pm.Y, pm.Z);
+         sb.AppendFormat(" NX {0:F8} {1:F8} {2:F8} ", n.X, n.Y, n.Z);
          sb.AppendLine();
       }
 
       private void AppendCurveGeometry(StringBuilder sb, NurbsCurve n)
       {
-         double l = n.GetLength();
-         double k0 = n.Knots.First();
-         double kn = n.Knots.Last();
-
-         // re-parametrize knot vectors to length of curve
-         double scale = 1.0;
-         if (Math.Abs(kn - k0) > 1.0E-6)
-            scale = l / (kn - k0);
-
-         for (int i = 0; i < n.Knots.Count; ++i)
+         if(n.Knots.Count == 2 && n.Degree == 1) // is a straight line: write as SLNB-record
          {
-            double si = (n.Knots[i] - k0) * scale;
+            var pa = n.PointAtStart;
+            var pe = n.PointAtEnd;
 
-            sb.AppendFormat("SLNN S {0:F6}", si);
-            if (i == 0)
-               sb.AppendFormat(" DEGR {0}", n.Degree);
+            sb.AppendFormat(" SLNB X1 {0:F8} {1:F8} {2:F8}", pa.X, pa.Y, pa.Z);
+            sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8}", pe.X, pe.Y, pe.Z);
             sb.AppendLine();
          }
-
-         bool first = true;
-         foreach (var p in n.Points)
+         else // write as nurbs
          {
-            sb.AppendFormat("SLNP X {0:F6} {1:F6} {2:F6}", p.Location.X, p.Location.Y, p.Location.Z);
-            if (p.Weight != 1.0)
+            double l = n.GetLength();
+            double k0 = n.Knots.First();
+            double kn = n.Knots.Last();
+
+            // re-parametrize knot vectors to length of curve
+            double scale = 1.0;
+            if (Math.Abs(kn - k0) > 1.0E-6)
+               scale = l / (kn - k0);
+
+            for (int i = 0; i < n.Knots.Count; ++i)
             {
-               sb.AppendFormat(" W {0:F6}", p.Weight);
+               double si = (n.Knots[i] - k0) * scale;
+
+               sb.AppendFormat(" SLNN S {0:F8}", si);
+               if (i == 0)
+                  sb.AppendFormat(" DEGR {0}", n.Degree);
+               sb.AppendLine();
             }
-            if (first)
+
+            bool first = true;
+            foreach (var p in n.Points)
             {
-               sb.Append(" TYPE NURB");
-               first = false;
+               sb.AppendFormat(" SLNP X {0:F8} {1:F8} {2:F8}", p.Location.X, p.Location.Y, p.Location.Z);
+               if (p.Weight != 1.0)
+               {
+                  sb.AppendFormat(" W {0:F8}", p.Weight);
+               }
+               if (first)
+               {
+                  sb.Append(" TYPE NURB");
+                  first = false;
+               }
+               sb.AppendLine();
             }
-            sb.AppendLine();
          }
       }
-
 
       private void AppendCurveGeometry(StringBuilder sb, Curve c)
       {
@@ -281,5 +287,89 @@ namespace gh_sofistik
             throw new ArgumentException("Encountered curve type is currently not supported: " + c.GetType().ToString());
          }
       }
+      #endregion
+
+      #region SURFACE_GEOMETRY
+      private void AppendSurfaceBoundary(StringBuilder sb, BrepFace fc)
+      {
+         foreach (var loop in fc.Loops)
+         {
+            string type;
+            if (loop.LoopType == BrepLoopType.Outer)
+               type = "OUT";
+            else if (loop.LoopType == BrepLoopType.Inner)
+               type = "IN";
+            else
+               continue;
+
+            foreach (var tr in loop.Trims)
+            {
+               var ed = tr.Edge;
+               if (ed != null)
+               {
+                  sb.AppendFormat("SARB {0}", type);
+                  sb.AppendLine();
+                  AppendCurveGeometry(sb, ed.EdgeCurve);
+               }
+            }
+         }
+      }
+
+      private void AppendSurfaceGeometry(StringBuilder sb, NurbsSurface ns)
+      {
+         if (ns == null)
+            return;
+
+         double ulength;
+         double vlength;
+
+         // reparametrize to real world length to minimize distortion in the map from parameter space to 3D
+         if(ns.GetSurfaceSize(out ulength, out vlength))
+         {
+            ns.SetDomain(0, new Interval(0, ulength));
+            ns.SetDomain(1, new Interval(1, vlength));
+         }
+
+         // write knot vectors
+         bool first = true;
+         foreach( var ku in ns.KnotsU )
+         {
+            sb.AppendFormat(" SARN S {0:F8}", ku);
+            if(first)
+            {
+               sb.AppendFormat(" DEGS {0}", ns.OrderU - 1);
+               first = false;
+            }
+            sb.AppendLine();
+         }
+
+         first = true;
+         foreach (var kv in ns.KnotsV)
+         {
+            sb.AppendFormat(" SARN T {0:F8}", kv);
+            if (first)
+            {
+               sb.AppendFormat(" DEGT {0}", ns.OrderV - 1);
+               first = false;
+            }
+            sb.AppendLine();
+         }
+
+         // write control points
+         for( int i=0; i<ns.Points.CountV; ++i)
+         {
+            for(int j=0; j<ns.Points.CountU; ++j)
+            {
+               var cpt = ns.Points.GetControlPoint(j, i);
+               double w = cpt.Weight;
+
+               sb.AppendFormat(" SARP NURB {0} {1}", j + 1, i + 1);
+               sb.AppendFormat(" X {0:F8} {1:F8} {2:F8} {3:F8}", cpt.X/w, cpt.Y/w, cpt.Z/w, w);
+               sb.AppendLine();
+            }
+         }
+
+      }
+      #endregion
    }
 }
