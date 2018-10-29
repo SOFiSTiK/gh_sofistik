@@ -32,13 +32,13 @@ namespace gh_sofistik
          //pManager.AddBooleanParameter("Create mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
          //pManager.AddNumberParameter("Mesh density", "HMIN", "Allows to set the global mesh density in [m]", GH_ParamAccess.item, 1.0);
          //pManager.AddTextParameter("Additional text input", "TXT", "Additional SOFiMSHC text input", GH_ParamAccess.item, string.Empty);
-         pManager.AddGeometryParameter("Load Elements", "G", "Collection of SOFiSTiK Load Elements", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Loads", "Ld", "Collection of SOFiSTiK Loads", GH_ParamAccess.list);
 
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("File", "F", "SOFiLOAD input data", GH_ParamAccess.item);
+         pManager.AddTextParameter("Text input", "O", "SOFiLOAD text input", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -61,7 +61,7 @@ namespace gh_sofistik
 
          string[,] load_types = { { "PXX", "PYY", "PZZ", "PX", "PY", "PZ" },{ "MXX", "MYY", "MZZ", "MX","MY","MZ"} };
 
-         foreach( var lc_loads in all_loads.GroupBy( ld => ld.LoadCase) )
+         foreach (var lc_loads in all_loads.GroupBy(ld => ld.LoadCase).OrderBy( ig => ig.Key))
          {
             if (lc_loads.Count() == 0)
                continue;

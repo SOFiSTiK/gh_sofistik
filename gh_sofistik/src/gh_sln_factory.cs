@@ -37,7 +37,7 @@ namespace gh_sofistik
 
       public override string ToString()
       {
-         return TypeName;
+         return "Structural Line, Id = " + Id.ToString();
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -143,7 +143,7 @@ namespace gh_sofistik
    public class CreateStructuralLine : GH_Component
    {
       public CreateStructuralLine()
-         : base("SLN","SLN","Creates SOFiSTiK Structural Lines","SOFiSTiK", "Geometry")
+         : base("Structural Line","Structural Line","Creates SOFiSTiK Structural Lines","SOFiSTiK", "Structure")
       {}
 
       protected override System.Drawing.Bitmap Icon
@@ -153,17 +153,17 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddCurveParameter("Curve", "Crv", "List of Curves", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number", "NO", "Identifiers of structural lines", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Group numbers of structural lines", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Section", "SNO", "Identifiers of cross section", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local Z", "DRZ", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
-         pManager.AddTextParameter("Fixation", "FIX", "Support conditions", GH_ParamAccess.list, string.Empty);
+         pManager.AddCurveParameter("Curve", "Crv", "Curve Geometry", GH_ParamAccess.list);
+         pManager.AddIntegerParameter("Number", "Number", "Identifier of structural line", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "Group", "Group number of structural line", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Section", "Section", "Identifier of cross section", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Dir Z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Line", "L", "SOFiSTiK Structural Line", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Line", "Ln", "SOFiSTiK Structural Line", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

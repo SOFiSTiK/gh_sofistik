@@ -33,7 +33,7 @@ namespace gh_sofistik
 
       public override string ToString()
       {
-         return this.TypeName;
+         return "Line Load, LC = " + LoadCase.ToString();
       }
 
       public override bool CastTo<Q>(out Q target)
@@ -83,7 +83,7 @@ namespace gh_sofistik
    public class CreateLineLoad : GH_Component
    {
       public CreateLineLoad()
-         : base("LINE", "LINE", "Creates SOFiSTiK Line Loads", "SOFiSTiK", "Loads")
+         : base("Line Load", "Line Load", "Creates SOFiSTiK Line Loads", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -93,16 +93,16 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Hosting Curve", "Crv", "Hosting Curve Geometry", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("LoadCase", "LC", "Id of load case", GH_ParamAccess.list, 1);
-         pManager.AddVectorParameter("Forces", "F", "Acting Forces", GH_ParamAccess.list, new Vector3d());
-         pManager.AddVectorParameter("Moments", "M", "Acting Moments", GH_ParamAccess.list, new Vector3d());
-         pManager.AddBooleanParameter("UseHostLocal", "isHL", "Use local coordinate system of host", GH_ParamAccess.list, false);
+         pManager.AddGeometryParameter("Hosting Curve", "Crv", "Hosting Curve / SOFiSTiK Structural Line", GH_ParamAccess.list);
+         pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
+         pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
+         pManager.AddBooleanParameter("HostLocal", "HostLocal", "Use local coordinate system of host", GH_ParamAccess.list, false);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Line Load", "L", "SOFiSTiK Line Load", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Line Load", "LLd", "SOFiSTiK Line Load", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

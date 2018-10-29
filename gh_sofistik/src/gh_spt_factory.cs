@@ -43,7 +43,7 @@ namespace gh_sofistik
 
       public override string ToString()
       {
-         return TypeName;
+         return "Structural Point, Id = " + Id.ToString();
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -139,7 +139,7 @@ namespace gh_sofistik
    public class CreateStructuralPoint : GH_Component
    {
       public CreateStructuralPoint()
-         : base("SPT", "SPT", "Creates SOFiSTiK Structural Points", "SOFiSTiK", "Geometry")
+         : base("Structural Point", "Structural Point", "Creates SOFiSTiK Structural Points", "SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -149,16 +149,16 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddPointParameter("Point", "P", "List of Points", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Number", "NO", "Identifiers of structural points", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local X", "TX", "Directions of local x-axis", GH_ParamAccess.list, new Vector3d());
-         pManager.AddVectorParameter("Local Z", "TZ", "Directions of local z-axis", GH_ParamAccess.list, new Vector3d());
-         pManager.AddTextParameter("Fixation", "FIX", "Support condition literal", GH_ParamAccess.list, string.Empty);
+         pManager.AddPointParameter("Point", "Pt", "Point Geometry", GH_ParamAccess.list);
+         pManager.AddIntegerParameter("Number", "Number", "Identifier of structural point", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Dir x", "Dir x", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Dir z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Point", "P", "SOFiSTiK Structural Point", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Point", "Pt", "SOFiSTiK Structural Point", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

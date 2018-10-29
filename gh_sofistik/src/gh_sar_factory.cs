@@ -37,7 +37,7 @@ namespace gh_sofistik
 
       public override string ToString()
       {
-         return TypeName; // TODO: add some more information?
+         return "Structural Area, Id = " + Id.ToString();
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -158,7 +158,7 @@ namespace gh_sofistik
    public class CreateStructuralArea : GH_Component
    {
       public CreateStructuralArea()
-         : base("SAR","SAR","Creates SOFiSTiK Structural Areas","SOFiSTiK", "Geometry")
+         : base("Structural Area","Structural Area","Creates SOFiSTiK Structural Areas","SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -168,18 +168,18 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddBrepParameter("Brep", "Brp", "List of Breps / Surfaces", GH_ParamAccess.list);
-         pManager.AddIntegerParameter("Area number", "NO", "Identifiers of structural areas", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Group", "GRP", "Group numbers", GH_ParamAccess.list, 0);
-         pManager.AddNumberParameter("Thickness", "T", "Thickness of structural areas", GH_ParamAccess.list, 0.0);
-         pManager.AddIntegerParameter("Material", "MNR", "Material numbers", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("ReinforcementMaterial", "MBW", "Reinforcement material numbers", GH_ParamAccess.list, 0);
-         pManager.AddVectorParameter("Local X", "DRX", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddBrepParameter("Brep", "Brep", "Brep / Surface Geometry", GH_ParamAccess.list);
+         pManager.AddIntegerParameter("Number", "Number", "Identifier of structural area", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("Group", "Group", "Group numbers", GH_ParamAccess.list, 0);
+         pManager.AddNumberParameter("Thickness", "Thickness", "Thickness of structural area", GH_ParamAccess.list, 0.0);
+         pManager.AddIntegerParameter("Material", "Material", "Material number", GH_ParamAccess.list, 0);
+         pManager.AddIntegerParameter("ReinforcementMaterial", "ReinfMat", "Reinforcement material number", GH_ParamAccess.list, 0);
+         pManager.AddVectorParameter("Dir x", "Dir x", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Area", "A", "SOFiSTiK Structural Area", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Area", "Ar", "SOFiSTiK Structural Area", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

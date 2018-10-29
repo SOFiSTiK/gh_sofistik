@@ -12,7 +12,7 @@ namespace gh_sofistik
    public class CreateSofimshcInput : GH_Component
    {
       public CreateSofimshcInput()
-         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Geometry")
+         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -27,28 +27,29 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddNumberParameter("Intersection tolerance", "TOLG", "Intersection tolerance", GH_ParamAccess.item, 0.01);
-         pManager.AddBooleanParameter("Create mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
-         pManager.AddNumberParameter("Mesh density", "HMIN", "Allows to set the global mesh density in [m]", GH_ParamAccess.item, 1.0);
-         pManager.AddTextParameter("Additional text input", "TXT", "Additional SOFiMSHC text input", GH_ParamAccess.item, string.Empty);
-         pManager.AddGeometryParameter("Structural Elements", "G", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
-
+         pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
+         pManager.AddTextParameter("Control Values", "Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
+         pManager.AddNumberParameter("Intersection tolerance", "Tolg", "Geometric intersection tolerance", GH_ParamAccess.item, 0.01);
+         pManager.AddBooleanParameter("Create mesh", "Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
+         pManager.AddNumberParameter("Mesh density", "Hmin", "Allows to set the global mesh density (called Hmin in SOFiSTiK) in [m]", GH_ParamAccess.item, 1.0);
+         pManager.AddTextParameter("Text input", "Text", "Additional input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("File", "F", "SOFiMSHC input data", GH_ParamAccess.item);
+         pManager.AddTextParameter("Text input", "O", "SOFiMSHC text input", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
-         double tolg = da.GetData<double>(0);
-         bool mesh = da.GetData<bool>(1);
-         double hmin = da.GetData<double>(2);
-         string ctrl = da.GetData<string>(3);
+         string ctrl = da.GetData<string>(1);
+         double tolg = da.GetData<double>(2);
+         bool mesh = da.GetData<bool>(3);
+         double hmin = da.GetData<double>(4);
+         string text = da.GetData<string>(5);
 
          var structural_elements = new List<IGS_StructuralElement>();
-         foreach( var it in da.GetDataList<IGH_Goo>(4))
+         foreach( var it in da.GetDataList<IGH_Goo>(0))
          {
             if (it is IGS_StructuralElement)
                structural_elements.Add(it as IGS_StructuralElement);
@@ -174,6 +175,13 @@ namespace gh_sofistik
             {
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unsupported type encountered: " + se.TypeName);
             }
+         }
+         sb.AppendLine();
+
+         // add control string
+         if (!string.IsNullOrEmpty(text))
+         {
+            sb.Append(text);
          }
          sb.AppendLine();
          sb.AppendLine("END");

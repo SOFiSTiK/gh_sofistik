@@ -31,7 +31,7 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          //pManager.AddTextParameter("Destination", "D", "Path to file destination", GH_ParamAccess.item, string.Empty);
-         pManager.AddTextParameter("SOFiSTiK input", "F", "Input for SOFiSTiK calculation", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("SOFiSTiK input", "I", "Input for SOFiSTiK calculation", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
