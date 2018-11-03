@@ -23,6 +23,11 @@ namespace gh_sofistik
          : base("CALCULATE", "CALCULATE", "Calculates the given input with SOFiSTiK", "SOFiSTiK", "General")
       { }
 
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.calculate_24x24; }
+      }
+
       public override Guid ComponentGuid
       {
          get { return new Guid("4043271E-D4CD-4321-8281-2805050159D1"); }

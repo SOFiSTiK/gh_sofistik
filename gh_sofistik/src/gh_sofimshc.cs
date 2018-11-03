@@ -17,7 +17,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofistik_32x32; }
+         get { return Properties.Resources.sofimshc_24x24; }
       }
 
       public override Guid ComponentGuid

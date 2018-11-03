@@ -118,11 +118,20 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="calculate_24x24" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\calculate01.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="folder_open_icon_16x16" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\src\img\folder-open-icon 16x16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="sofistik_32x32" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\src\img\sofistik_32x32.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="sofiload_24x24" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\sofiload01.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="sofimshc_24x24" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\sofimshc01.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="sofistik_24" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\sofistik_24.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="structural_area16" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\src\img\structural_area16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -130,7 +139,13 @@
   <data name="structural_line16" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\src\img\structural_line16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="structural_line_load_16" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\structural_line-load-1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="structural_point16" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\src\img\structural_point16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="structural_point_load_16" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\src\img\structural_point_load.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

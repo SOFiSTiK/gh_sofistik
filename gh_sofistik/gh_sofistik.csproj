@@ -119,6 +119,30 @@
   <ItemGroup>
     <None Include="src\img\animator 16x16.bmp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\design\structural_point_32x32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\design\structural_point_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofistik_24.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_line-load-1.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_point_load.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\calculate01.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofiload01.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofimshc01.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>copy "$(TargetPath)" "$(TargetDir)$(ProjectName).gha"

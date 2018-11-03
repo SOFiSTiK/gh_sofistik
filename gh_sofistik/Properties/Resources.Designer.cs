@@ -63,6 +63,16 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        public static System.Drawing.Bitmap calculate_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("calculate_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         public static System.Drawing.Bitmap folder_open_icon_16x16 {
             get {
                 object obj = ResourceManager.GetObject("folder_open_icon_16x16", resourceCulture);
@@ -73,9 +83,29 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap sofistik_32x32 {
+        public static System.Drawing.Bitmap sofiload_24x24 {
             get {
-                object obj = ResourceManager.GetObject("sofistik_32x32", resourceCulture);
+                object obj = ResourceManager.GetObject("sofiload_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap sofimshc_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("sofimshc_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap sofistik_24 {
+            get {
+                object obj = ResourceManager.GetObject("sofistik_24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -93,9 +123,29 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        public static System.Drawing.Bitmap structural_line_load_16 {
+            get {
+                object obj = ResourceManager.GetObject("structural_line_load_16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         public static System.Drawing.Bitmap structural_line16 {
             get {
                 object obj = ResourceManager.GetObject("structural_line16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap structural_point_load_16 {
+            get {
+                object obj = ResourceManager.GetObject("structural_point_load_16", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

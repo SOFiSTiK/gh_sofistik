@@ -88,7 +88,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofistik_32x32; } // TODO
+         get { return Properties.Resources.structural_line_load_16; } // TODO
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
