@@ -105,6 +105,13 @@ namespace gh_sofistik
 
             var str_id = this.Id > 0 ? Id.ToString() : "0"; // string.Empty;
 
+            string fix_literal = this.FixLiteral;
+            fix_literal.Replace("PP", "PXPYPZ");
+            fix_literal.Replace("MM", "MXMYMZ");
+            if (fix_literal == "F")
+               fix_literal = "PXPYPZMXMYMZ";
+
+            // set user strings
             att.SetUserString("SOF_OBJ_TYPE", "SLN");
             att.SetUserString("SOF_ID", str_id);
 
@@ -126,8 +133,8 @@ namespace gh_sofistik
                att.SetUserString("SOF_DRZ", DirectionLocalZ.Z.ToString("F6"));
             }
 
-            if (string.IsNullOrEmpty(FixLiteral) == false)
-               att.SetUserString("SOF_FIX", FixLiteral);
+            if (string.IsNullOrEmpty(fix_literal) == false)
+               att.SetUserString("SOF_FIX", fix_literal);
 
             obj_guid = doc.Objects.AddCurve(Value, att);
          }

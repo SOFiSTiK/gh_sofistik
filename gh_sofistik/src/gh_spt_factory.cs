@@ -120,10 +120,25 @@ namespace gh_sofistik
          {
             var att = baking_attributes.Duplicate();
 
+            string fix_literal = this.FixLiteral;
+            fix_literal.Replace("PP", "PXPYPZ");
+            fix_literal.Replace("MM", "MXMYMZ");
+            if (fix_literal == "F")
+               fix_literal = "PXPYPZMXMYMZ";
+
+
             att.SetUserString("SOF_OBJ_TYPE", "SPT");
             att.SetUserString("SOF_ID", this.Id.ToString());
-            att.SetUserString("SOF_FIX", this.FixLiteral);
-            // TODO
+            att.SetUserString("SOF_SX", this.DirectionLocalX.X.ToString("F6"));
+            att.SetUserString("SOF_SY", this.DirectionLocalX.Y.ToString("F6"));
+            att.SetUserString("SOF_SZ", this.DirectionLocalX.Z.ToString("F6"));
+            att.SetUserString("SOF_NX", this.DirectionLocalZ.X.ToString("F6"));
+            att.SetUserString("SOF_NY", this.DirectionLocalZ.Y.ToString("F6"));
+            att.SetUserString("SOF_NZ", this.DirectionLocalZ.Z.ToString("F6"));
+
+            if(string.IsNullOrEmpty(fix_literal) == false)
+               att.SetUserString("SOF_FIX", fix_literal);
+
 
             obj_guid = doc.Objects.AddPoint(Value.Location, att);
          }
