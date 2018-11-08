@@ -105,9 +105,10 @@ namespace gh_sofistik
 
             var str_id = this.Id > 0 ? Id.ToString() : "0"; // string.Empty;
 
-            string fix_literal = this.FixLiteral;
-            fix_literal.Replace("PP", "PXPYPZ");
-            fix_literal.Replace("MM", "MXMYMZ");
+            string fix_literal = this.FixLiteral
+               .Replace("PP", "PXPYPZ")
+               .Replace("MM", "MXMYMZ");
+
             if (fix_literal == "F")
                fix_literal = "PXPYPZMXMYMZ";
 
@@ -126,7 +127,7 @@ namespace gh_sofistik
             }
             att.SetUserString("SOF_SDIV", "0.0");
 
-            if(DirectionLocalZ.Length > 1.0E-8)
+            if(DirectionLocalZ.Length > 1.0E-6)
             {
                att.SetUserString("SOF_DRX", DirectionLocalZ.X.ToString("F6"));
                att.SetUserString("SOF_DRY", DirectionLocalZ.Y.ToString("F6"));

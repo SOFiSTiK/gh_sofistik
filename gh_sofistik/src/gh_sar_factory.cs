@@ -135,7 +135,7 @@ namespace gh_sofistik
             if (ReinforcementId > 0)
                att.SetUserString("SOF_MRF", ReinforcementId.ToString());
 
-            if(DirectionLocalX.Length > 1.0e-8)
+            if(DirectionLocalX.Length > 1.0e-6)
             {
                att.SetUserString("SOF_DRX", DirectionLocalX.X.ToString("F6"));
                att.SetUserString("SOF_DRX", DirectionLocalX.Y.ToString("F6"));
