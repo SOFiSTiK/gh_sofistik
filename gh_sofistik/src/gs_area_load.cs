@@ -12,40 +12,40 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   public class GS_LineLoad : GH_GeometricGoo<Curve>, IGS_Load
+   public class GS_AreaLoad : GH_GeometricGoo<Brep>, IGS_Load
    {
       public int LoadCase { get; set; } = 0;
       public bool UseHostLocal { get; set; } = false;
       public Vector3d Forces { get; set; } = new Vector3d();
       public Vector3d Moments { get; set; } = new Vector3d();
 
-      public int ReferenceLineId { get; set; } = 0;
+      public int ReferenceAreaId { get; set; } = 0;
 
       public override string TypeName
       {
-         get { return "GS_LineLoad"; }
+         get { return "GS_AreaLoad"; }
       }
 
       public override string TypeDescription
       {
-         get { return "Line Load of load case " + LoadCase.ToString(); }
+         get { return "Area Load of load case " + LoadCase.ToString(); }
       }
 
       public override string ToString()
       {
-         return "Line Load, LC = " + LoadCase.ToString();
+         return "Area Load, LC = " + LoadCase.ToString();
       }
 
       public override bool CastTo<Q>(out Q target)
       {
-         return Util.CastCurveTo(this.Value, out target);
+         return Util.CastBrepTo(this.Value, out target);
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
       {
-         return new GS_LineLoad()
+         return new GS_AreaLoad()
          {
-            Value = this.Value.DuplicateCurve(),
+            Value = this.Value.DuplicateBrep(),
             LoadCase = this.LoadCase,
             Forces = this.Forces,
             Moments = this.Moments,
@@ -80,20 +80,20 @@ namespace gh_sofistik
       }
    }
 
-   public class CreateLineLoad : GH_Component
+   public class CreateAreaLoad : GH_Component
    {
-      public CreateLineLoad()
-         : base("Line Load", "Line Load", "Creates SOFiSTiK Line Loads", "SOFiSTiK", "Loads")
+      public CreateAreaLoad()
+         : base("Area Load", "Area Load", "Creates SOFiSTiK Area Loads", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_line_load_16; } // TODO
+         get { return Properties.Resources.sofistik_24; } // TODO
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Hosting Curve / Sln", "Crv / Sln", "Hosting Curve / SOFiSTiK Structural Line", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Hosting Brep / Sar", "Brp / Sar", "Hosting Brep / SOFiSTiK Structural Area", GH_ParamAccess.list);
          pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
          pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
          pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
@@ -102,26 +102,26 @@ namespace gh_sofistik
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Line Load", "LLd", "SOFiSTiK Line Load", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Area Load", "ALd", "SOFiSTiK Area Load", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
-         var curves = da.GetDataList<IGH_GeometricGoo>(0);
+         var areas = da.GetDataList<IGH_GeometricGoo>(0);
          var loadcases = da.GetDataList<int>(1);
          var forces = da.GetDataList<Vector3d>(2);
          var moments = da.GetDataList<Vector3d>(3);
          var hostlocals = da.GetDataList<bool>(4);
 
-         var gs_line_loads = new List<GS_LineLoad>();
+         var gs_area_loads = new List<GS_AreaLoad>();
 
-         int max_count = Math.Max(curves.Count, loadcases.Count);
+         int max_count = Math.Max(areas.Count, loadcases.Count); // either area or lc is the leading input
 
          for (int i = 0; i < max_count; ++i)
          {
-            var curve = curves.GetItemOrLast(i);
+            var area = areas.GetItemOrLast(i);
 
-            var ll = new GS_LineLoad()
+            var ll = new GS_AreaLoad()
             {
                LoadCase = loadcases.GetItemOrLast(i),
                Forces = forces.GetItemOrLast(i),
@@ -129,39 +129,31 @@ namespace gh_sofistik
                UseHostLocal = hostlocals.GetItemOrLast(i)
             };
 
-            if(curve is GS_StructuralLine)
+            if(area is GS_StructuralArea)
             {
-               var sln = curve as GS_StructuralLine;
+               var sar = area as GS_StructuralArea;
 
-               ll.Value = sln.Value;
-               ll.ReferenceLineId = sln.Id; // pass id of structural line
+               ll.Value = sar.Value;
+               ll.ReferenceAreaId = sar.Id; // pass id of structural area
             }
-            else if(curve is GH_Curve)
+            else if(area is GH_Brep)
             {
-               ll.Value = (curve as GH_Curve).Value;
-            }
-            else if (curve is GH_Line)
-            {
-               ll.Value = new LineCurve((curve as GH_Line).Value);
-            }
-            else if (curve is GH_Arc)
-            {
-               ll.Value = new ArcCurve((curve as GH_Arc).Value);
+               ll.Value = (area as GH_Brep).Value;
             }
             else
             {
                throw new Exception("Unable to Cast input to Curve Geometry");
             }
 
-            gs_line_loads.Add(ll);
+            gs_area_loads.Add(ll);
          }
 
-         da.SetDataList(0, gs_line_loads);
+         da.SetDataList(0, gs_area_loads);
       }
 
       public override Guid ComponentGuid
       {
-         get { return new Guid("992ADED6-7395-4166-8DA7-7C78AE554615"); }
+         get { return new Guid("0CB20B1B-AD3C-40E5-B3BD-3E4226BD02B3"); }
       }
    }
 }

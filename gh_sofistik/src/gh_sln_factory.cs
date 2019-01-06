@@ -171,7 +171,7 @@ namespace gh_sofistik
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Line", "Ln", "SOFiSTiK Structural Line", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Line", "Sln", "SOFiSTiK Structural Line", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)

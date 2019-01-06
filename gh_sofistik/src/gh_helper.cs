@@ -114,5 +114,21 @@ namespace gh_sofistik
          target = default(Q);
          return false;
       }
+
+      public static bool CastBrepTo<Q>(Rhino.Geometry.Brep brep, out Q target)
+      {
+         if(brep != null)
+         {
+            if(typeof(Q).IsAssignableFrom(typeof(GH_Brep)))
+            {
+               var gb = new GH_Brep(brep);
+               target = (Q)(object)gb;
+               return true;
+            }
+         }
+
+         target = default(Q);
+         return false;
+      }
    }
 }

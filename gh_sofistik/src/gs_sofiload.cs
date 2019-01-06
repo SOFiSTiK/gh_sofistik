@@ -10,6 +10,71 @@ using Rhino.Geometry;
 namespace gh_sofistik
 {
 
+   public class CreateLoadCase : GH_Component
+   {
+      public CreateLoadCase()
+         : base("LoadCase", "LoadCase", "Defines Load Cases for SOFiLOAD", "SOFiSTiK", "Loads")
+      {}
+
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.sofistik_24; }
+      }
+
+      public override Guid ComponentGuid
+      {
+         get { return new Guid("335DBCBC-3320-47E5-9633-29E129A4CBCF"); }
+      }
+
+      protected override void RegisterInputParams(GH_InputParamManager pManager)
+      {
+         pManager.AddIntegerParameter("Id", "Id", "Number of Load Case", GH_ParamAccess.list);
+         pManager.AddTextParameter("Type", "Type", "Type / Action of Load Case", GH_ParamAccess.list, string.Empty);
+         pManager.AddNumberParameter("Facd", "Facd", "Factor of structural dead weight", GH_ParamAccess.list, 0.0);
+         pManager.AddTextParameter("Title", "Title", "Title of Load Case", GH_ParamAccess.list, string.Empty);
+      }
+
+      protected override void RegisterOutputParams(GH_OutputParamManager pManager)
+      {
+         pManager.AddTextParameter("Lc", "Lc", "SOFiLOAD Input", GH_ParamAccess.list);
+      }
+
+      protected override void SolveInstance(IGH_DataAccess da)
+      {
+         var ids = da.GetDataList<int>(0);
+         var types = da.GetDataList<string>(1);
+         var facds = da.GetDataList<double>(2);
+         var titls = da.GetDataList<string>(3);
+
+         var load_cases = new List<string>();
+
+         var sb = new StringBuilder();
+
+         for( int i=0; i<ids.Count; ++i)
+         {
+            sb.Clear();
+
+            var id = ids[i];
+            var type = types.GetItemOrLast(i);
+            var facd = facds.GetItemOrLast(i);
+            var titl = titls.GetItemOrLast(i);
+
+            if (type == string.Empty) type = "NONE";
+
+            sb.AppendFormat("LC {0} TYPE {1}", id, type);
+            if (Math.Abs(facd) > 1.0E-6)
+               sb.AppendFormat(" FACD {0:F3}", facd);
+            if (string.IsNullOrEmpty(titl) == false)
+               sb.AppendFormat(" TITL {0}", titl);
+            sb.AppendLine();
+
+            load_cases.Add(sb.ToString());
+         }
+
+         da.SetDataList(0, load_cases);
+      }
+   }
+
    public class CreateSofiloadInput : GH_Component
    {
       public CreateSofiloadInput()
@@ -28,12 +93,8 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         //pManager.AddNumberParameter("Intersection tolerance", "TOLG", "Intersection tolerance", GH_ParamAccess.item, 0.01);
-         //pManager.AddBooleanParameter("Create mesh", "MESH", "Activates mesh generation", GH_ParamAccess.item, true);
-         //pManager.AddNumberParameter("Mesh density", "HMIN", "Allows to set the global mesh density in [m]", GH_ParamAccess.item, 1.0);
-         //pManager.AddTextParameter("Additional text input", "TXT", "Additional SOFiMSHC text input", GH_ParamAccess.item, string.Empty);
-         pManager.AddGeometryParameter("Loads", "Ld", "Collection of SOFiSTiK Loads", GH_ParamAccess.list);
-
+         pManager.AddGeometryParameter("Ld", "Ld", "Collection of SOFiSTiK Load Items", GH_ParamAccess.list);
+         pManager.AddTextParameter("Lc", "Lc", "Load Case Definition (in SOFiLOAD Syntax)", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -43,6 +104,7 @@ namespace gh_sofistik
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
+         // get load case definitions
          var all_loads = new List<IGS_Load>();
          foreach( var it in da.GetDataList<IGH_Goo>(0))
          {
@@ -50,6 +112,18 @@ namespace gh_sofistik
                all_loads.Add(it as IGS_Load);
             else
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_Load.");
+         }
+
+         // extract load case headers
+         var load_cases = new Dictionary<int, string>();
+         foreach( var ilc in da.GetDataList<string>(1))
+         {
+            int id = 0;
+            var slc = ilc.Split(null,3);
+            if(slc.Length>2 && int.TryParse(slc[1],out id))
+            {
+               load_cases.Add(id, ilc);
+            }
          }
 
          var sb = new StringBuilder();
@@ -66,8 +140,16 @@ namespace gh_sofistik
             if (lc_loads.Count() == 0)
                continue;
 
-            sb.AppendFormat("LC {0}", lc_loads.Key);
-            sb.AppendLine();
+            string lc_definition = string.Empty;
+            if(load_cases.TryGetValue(lc_loads.Key,out lc_definition))
+            {
+               sb.AppendLine(lc_definition.Trim());
+            }
+            else
+            {
+               sb.AppendFormat("LC {0}", lc_loads.Key);
+               sb.AppendLine();
+            }
 
             foreach( var ld in lc_loads)
             {
@@ -115,7 +197,7 @@ namespace gh_sofistik
 
                   var points = hosted ? new List<Point3d>() : GetCurvePolygon(ll.Value);
 
-                  for (int i=0; i<3; ++i)
+                  for (int i=0; i < 3; ++i)
                   {
                      if(Math.Abs(ll.Forces[i]) > 1.0E-6)
                      {
@@ -131,9 +213,61 @@ namespace gh_sofistik
                      if (Math.Abs(ll.Moments[i]) > 1.0E-6)
                      {
                         sb.AppendFormat("{0} {1} {2}", cmd_string, ref_string, no_string);
-                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[1, i + type_off], ll.Forces[i]);
+                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[1, i + type_off], ll.Moments[i]);
                         AppendLoadGeometry(sb, points);
                         sb.AppendLine();
+                     }
+                  }
+               }
+               else if(ld is GS_AreaLoad)
+               {
+                  var al = ld as GS_AreaLoad;
+
+                  bool hosted = al.ReferenceAreaId > 0;
+
+                  string cmd_string = "AREA";
+                  string ref_string = hosted ? "SAR" : "AUTO";
+                  string no_string = hosted ? al.ReferenceAreaId.ToString() : "-";
+                  int type_off = al.UseHostLocal ? 3 : 0;
+
+                  foreach( var fc in al.Value.Faces )
+                  {
+                     // checks and preparations
+                     fc.ShrinkFace(BrepFace.ShrinkDisableSide.ShrinkAllSides);
+
+                     if (fc.IsClosed(0) || fc.IsClosed(1))
+                     {
+                        this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "A given Surface is closed in one direction.\nSuch surfaces cannot be handled properly and need to be split.");
+                     }
+
+                     var points = hosted ? new List<Point3d>() : GetFacePolygon(fc);
+
+                     if(points.Count > 63)
+                     {
+                        this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Boundary of area load is too complex to be resolved properly.\nPlease simplify given brep geometry or use structural area as input.");
+                        points.RemoveRange(63, points.Count - 63);
+                     }
+
+                     for (int i = 0; i < 3; ++i)
+                     {
+                        if (Math.Abs(al.Forces[i]) > 1.0E-6)
+                        {
+                           sb.AppendFormat("{0} {1} {2}", cmd_string, ref_string, no_string);
+                           sb.AppendFormat(" TYPE {0} {1:F6}", load_types[0, i + type_off], al.Forces[i]);
+                           AppendLoadGeometry(sb, points);
+                           sb.AppendLine();
+                        }
+                     }
+
+                     for (int i = 0; i < 3; ++i)
+                     {
+                        if (Math.Abs(al.Moments[i]) > 1.0E-6)
+                        {
+                           sb.AppendFormat("{0} {1} {2}", cmd_string, ref_string, no_string);
+                           sb.AppendFormat(" TYPE {0} {1:F6}", load_types[1, i + type_off], al.Moments[i]);
+                           AppendLoadGeometry(sb, points);
+                           sb.AppendLine();
+                        }
                      }
                   }
                }
@@ -141,6 +275,7 @@ namespace gh_sofistik
                {
                   AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unsupported type encountered: " + ld.TypeName);
                }
+               sb.AppendLine();
             }
          }
 
@@ -205,6 +340,26 @@ namespace gh_sofistik
       }
 
 
-      //private void AppendLoadLine(StringBuilder sb, )
+      private List<Point3d> GetFacePolygon(BrepFace fc)
+      {
+         var points = new List<Point3d>();
+
+         foreach( var loop in fc.Loops)
+         {
+            if(loop.LoopType == BrepLoopType.Outer)
+            {
+               foreach( var tr in loop.Trims )
+               {
+                  var cv = tr?.Edge?.EdgeCurve;
+                  if(cv != null)
+                  {
+                     points.AddRange(GetCurvePolygon(cv));
+                  }
+               }
+            }
+         }
+
+         return points;
+      }
    }
 }

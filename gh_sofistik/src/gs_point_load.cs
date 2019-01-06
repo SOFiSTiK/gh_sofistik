@@ -111,7 +111,7 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Hosting Point", "Pt", "Hosting Point / SOFiSTiK Structural Point", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Hosting Point / Spt", "Pt / Spt", "Hosting Point / SOFiSTiK Structural Point", GH_ParamAccess.list);
          pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
          pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
          pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
@@ -133,8 +133,12 @@ namespace gh_sofistik
 
          var gs_point_loads = new List<GS_PointLoad>();
 
-         for(int i=0; i<points.Count; ++i)
+         int max_count = Math.Max(points.Count, loadcases.Count);
+
+         for (int i=0; i<max_count; ++i)
          {
+            var point = points.GetItemOrLast(i);
+
             var pl = new GS_PointLoad()
             {
                LoadCase = loadcases.GetItemOrLast(i),
@@ -143,16 +147,16 @@ namespace gh_sofistik
                UseHostLocal = hostlocals.GetItemOrLast(i)
             };
 
-            if(points[i] is GS_StructuralPoint)
+            if(point is GS_StructuralPoint)
             {
-               var spt = points[i] as GS_StructuralPoint;
+               var spt = point as GS_StructuralPoint;
 
                pl.Value = spt.Value;
                pl.ReferencePointId = spt.Id; // pass id of structural point
             }
-            else if(points[i] is GH_Point)
+            else if(point is GH_Point)
             {
-               pl.Value = new Point((points[i] as GH_Point).Value);
+               pl.Value = new Point((point as GH_Point).Value);
             }
             else
             {

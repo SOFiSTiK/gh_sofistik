@@ -179,7 +179,7 @@ namespace gh_sofistik
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Area", "Ar", "SOFiSTiK Structural Area", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Area", "Sar", "SOFiSTiK Structural Area", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
