@@ -3,18 +3,21 @@
 Grasshopper components allowing to add analytical properties to Grasshopper geometry and convert this geometry into SOFiSTiK input files.
 
 Install the components by dragging & dropping the assembly gh_sofistik.gha from the subfolder ./bin onto the Grasshopper window.
-After installation a SOFiSTiK tab should appear in the control panel of Grasshopper containing four components:
+After installation a SOFiSTiK tab should appear in the control panel of Grasshopper providing four groups of components:
 
-* SPT: allowing to add SOFiSTiK analytical properties to a point
-* SLN: allowing to add SOFiSTiK analytical properties to a curve
-* SAR: allowing to add SOFiSTiK analytical properties to a brep or surface geometry
-* SOFiMSHC: creates text input for the SOFiSTiK mesher SOFiMSHC from a list of items defined by the components SPT, SLN and SAR
+* General: provides a component to calculate a SOFiSTiK input directly from within GH
+* Geometry: currently provides a auxiliary component to create a SOFiSTiK axis definition (SOFiMSHC: GAX) from a curve geometry
+* Structure: provides components to convert points, lines and areas to SOFiSTiK structural elements. These elements can be then 
+  passed to an additional component which allows to convert the structural element information into a SOFIMSHC input file.
+* Loads: provides components to add loads to points, lines and areas. As input, Grasshopper geometry as well as structural items
+  defined by the components described before can be used. An additional component, called SOFiLOAD allows to convert these loading
+  items into a SOFiLOAD input file.
 
-Following image shows its usage together with the SOFiSTiK analytical model generated from the text input in Grasshopper:
+Following image displayes an example together with the generated SOFiSTiK analytical model:
 
 ![Creation of Girder System](https://github.com/SOFiSTiK/gh_sofistik/blob/master/gh_sofistik/examples/img/girder_system_01.JPG)
 
-The components SPT, SLN and SAR for generating SOFiSTiK structural entities also support 'Baking' such that the defined 
+The components for defining structural elements in the structural groupalso support 'Baking' such that the defined 
 analytical properties will be transferred to Rhino accessible by the SOFiSTiK Rhino Interface there.
 This means, the geometry baked within Rhino can be further edited and meshed to a SOFiSTiK analytical model from there - 
 provided, of course, you have the SOFiSTiK Rhino Interface installed.
