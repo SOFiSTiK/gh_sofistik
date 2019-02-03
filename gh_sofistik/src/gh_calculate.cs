@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using GH_IO.Serialization;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
@@ -12,16 +13,25 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   public class Calculate : GH_Component
+   public class ProjectFile : GH_Component
    {
-      private List<string> _text_input = new List<string>();
+      private string _path_by_dialog = string.Empty;
+      private string _path_active = string.Empty;
+      private bool _stream_content = true;
 
-      private string _file_path = string.Empty;
-      private bool _stream_content = false;
-
-      public Calculate()
-         : base("CALCULATE", "CALCULATE", "Calculates the given input with SOFiSTiK", "SOFiSTiK", "General")
+      public ProjectFile()
+         : base("Project File", "ProjFile", "Streams the given input to a SOFiSTiK project file", "SOFiSTiK", "General")
       { }
+
+      public override bool IsPreviewCapable
+      {
+         get { return false; }
+      }
+
+      public override bool IsBakeCapable
+      {
+         get { return false; }
+      }
 
       protected override System.Drawing.Bitmap Icon
       {
@@ -35,8 +45,8 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         //pManager.AddTextParameter("Destination", "D", "Path to file destination", GH_ParamAccess.item, string.Empty);
-         pManager.AddTextParameter("SOFiSTiK input", "I", "Input for SOFiSTiK calculation", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("SOFiSTiK Input", "Txt", "Input for SOFiSTiK calculation", GH_ParamAccess.list);
+         pManager.AddTextParameter("Path", "Path", "Path to Project File", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -46,29 +56,52 @@ namespace gh_sofistik
 
       public override bool Write(GH_IWriter writer)
       {
-         writer.SetString("SOF_FILE_PATH",_file_path);
+         writer.SetString("SOF_FILE_PATH",_path_by_dialog);
          writer.SetBoolean("SOF_STREAM_CONTENT", _stream_content);
          return base.Write(writer);
       }
 
       public override bool Read(GH_IReader reader)
       {
-         reader.TryGetString("SOF_FILE_PATH", ref _file_path);
+         reader.TryGetString("SOF_FILE_PATH", ref _path_by_dialog);
          reader.TryGetBoolean("SOF_STREAM_CONTENT", ref _stream_content);
          return base.Read(reader);
       }
 
-      protected override void SolveInstance(IGH_DataAccess DA)
+      protected override void SolveInstance(IGH_DataAccess da)
       {
-         _text_input.Clear();
-         _text_input.AddRange(DA.GetDataList<string>(0));
+         var text_input = da.GetDataList<string>(0);
 
-         if(_stream_content)
+         var file_name = da.GetData<string>(1);
+         if (string.IsNullOrEmpty(file_name)) // take from local variable set by dialog
          {
-            string dat_file = GetDestinationDatFile();
-            WriteDatContentTo(dat_file);
+            file_name = _path_by_dialog;
+
+            if(string.IsNullOrEmpty(file_name))
+            {
+               AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "No file name specified");
+               return;
+            }
          }
+
+         // check directory
+         var dir_name = System.IO.Path.GetDirectoryName(file_name);
+         if (!System.IO.Directory.Exists(dir_name))
+         {
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Given file directory does not exist!");
+            return;
+         }
+
+         // write to file
+         var file_exists = System.IO.File.Exists(file_name);
+         if(_stream_content || file_exists == false)
+         {
+            WriteDatContentTo(file_name, text_input);
+         }
+
+         _path_active = file_name;
       }
+
 
       public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
       {
@@ -79,7 +112,7 @@ namespace gh_sofistik
          Menu_AppendItem(menu, "Stream Input", Menu_OnStreamContentClicked, true, _stream_content);
          Menu_AppendSeparator(menu);
          Menu_AppendItem(menu, "Calculate Project", Menu_OnCalculateWPS);
-         Menu_AppendItem(menu, "Open Animator", Menu_OnOpenAnimator);
+         Menu_AppendItem(menu, "System Visualisation", Menu_OnOpenAnimator);
          Menu_AppendItem(menu, "Open Teddy", Menu_OnOpenTeddy);
       }
 
@@ -113,28 +146,21 @@ namespace gh_sofistik
             Multiselect = false
          };
 
-         if(dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+         if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
          {
-            if(!string.IsNullOrWhiteSpace(dlg.FileName))
+            if (!string.IsNullOrWhiteSpace(dlg.FileName))
             {
-               _file_path = dlg.FileName;
+               _path_by_dialog = dlg.FileName;
             }
          }
       }
 
       private void Menu_OnCalculateWPS(Object sender, EventArgs e)
       {
-         string dat_file = GetDestinationDatFile();
-
-         if(!_stream_content)
-         {
-            WriteDatContentTo(dat_file);
-         }
-
          // start wps
          var process = new System.Diagnostics.Process();
          process.StartInfo.FileName = "wps.exe";
-         process.StartInfo.Arguments = "/B \"" + dat_file + "\"";
+         process.StartInfo.Arguments = "/B \"" + _path_active + "\"";
 
          if (!process.Start())
             this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to start SOFiSTiK WPS.exe");
@@ -142,61 +168,28 @@ namespace gh_sofistik
 
       private void Menu_OnOpenAnimator(Object sender, EventArgs e)
       {
-         string dat_file = GetDestinationDatFile();
-
          var process = new System.Diagnostics.Process();
          process.StartInfo.FileName = "animator.exe";
-         process.StartInfo.Arguments = System.IO.Path.ChangeExtension(dat_file, ".cdb");
+         process.StartInfo.Arguments = System.IO.Path.ChangeExtension(_path_active, ".cdb");
 
          process.Start();
       }
 
       private void Menu_OnOpenTeddy(Object sender, EventArgs e)
       {
-         string dat_file = GetDestinationDatFile();
-
          var process = new System.Diagnostics.Process();
          process.StartInfo.FileName = "ted.exe";
-         process.StartInfo.Arguments = dat_file;
+         process.StartInfo.Arguments = _path_active;
 
          process.Start();
       }
 
-
-      private string GetDestinationDatFile()
-      {
-         string file_path = _file_path;
-
-         if (string.IsNullOrEmpty(file_path))
-         {
-            file_path = Grasshopper.Instances.ActiveCanvas?.Document?.FilePath ?? string.Empty;
-
-            if (string.IsNullOrEmpty(file_path))
-               file_path = System.IO.Path.GetTempFileName();
-
-            file_path = System.IO.Path.ChangeExtension(file_path, ".dat");
-         }
-         else
-         {
-            var dir_name = System.IO.Path.GetDirectoryName(file_path);
-            if (!System.IO.Directory.Exists(dir_name))
-               throw new Exception("Given directory at parameter D does not exist");
-
-            if (string.IsNullOrEmpty(System.IO.Path.GetFileName(file_path)))
-               throw new Exception("No valid file name given at parameter D");
-
-            file_path = System.IO.Path.ChangeExtension(file_path, ".dat");
-         }
-
-         return file_path;
-      }
-
-      private void WriteDatContentTo(string path)
+      private void WriteDatContentTo(string path, List<string> text_input)
       {
          // stream content into file
          using (var sw = new System.IO.StreamWriter(path, false))
          {
-            foreach (var txt in _text_input)
+            foreach (var txt in text_input)
             {
                sw.Write(txt);
                sw.WriteLine();
