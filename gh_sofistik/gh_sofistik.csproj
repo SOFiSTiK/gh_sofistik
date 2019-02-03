@@ -61,6 +61,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="src\gh_calculate.cs" />
+    <Compile Include="src\gh_create_axis.cs" />
     <Compile Include="src\gh_helper.cs" />
     <Compile Include="src\gs_area_load.cs" />
     <Compile Include="src\gs_line_load.cs" />
