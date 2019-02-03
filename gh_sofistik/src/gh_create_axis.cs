@@ -65,6 +65,8 @@ namespace gh_sofistik
 
             // type
             string type = types.GetItemOrLast(ic);
+            if (string.IsNullOrWhiteSpace(type))
+               type = "LANE";
 
             // write
             if(c is LineCurve)
