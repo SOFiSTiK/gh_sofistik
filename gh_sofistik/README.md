@@ -5,15 +5,18 @@ Grasshopper components allowing to add analytical properties to Grasshopper geom
 Install the components by dragging & dropping the assembly gh_sofistik.gha from the subfolder ./bin onto the Grasshopper window.
 After installation a SOFiSTiK tab should appear in the control panel of Grasshopper containing four groups of components:
 
-* General: provides a component to stream data to a SOFiSTiK input file
+* General: provides a component for global visualization settings and a component allowing to stream text data to a file,
+  e.g. a SOFiSTiK input file
 * Geometry: provides currently one auxiliary component to create a SOFiSTiK axis definition (SOFiMSHC: GAX) from curve geometry
-* Structure: provides components to convert points, lines and areas to SOFiSTiK structural elements. These elements can be then 
-  passed to an additional component which allows to convert the structural element information into SOFIMSHC input.
+* Structure: provides components to convert points, lines and areas to SOFiSTiK structural elements as well as components to
+  create rigid and elastic couplings between these structural elements.
+  All these structural elements can then be passed to an additional component, called SOFiMSHC which converts the structural
+  information into a SOFiSTiK input which can be streamed to a file and calculated there.
 * Loads: provides components to add loads to points, lines and areas. As input, Grasshopper geometry as well as structural items
   defined by the components described before can be used. An additional component, called SOFiLOAD allows to convert these loading
   items into SOFiLOAD input.
 
-Following image displayes an example together with the generated SOFiSTiK analytical model:
+Following image displays an example together with the generated SOFiSTiK analytical model:
 
 ![Creation of Girder System](https://github.com/SOFiSTiK/gh_sofistik/blob/master/gh_sofistik/examples/img/girder_system_01.JPG)
 
