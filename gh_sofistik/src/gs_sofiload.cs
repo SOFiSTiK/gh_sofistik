@@ -158,8 +158,8 @@ namespace gh_sofistik
                   var pl = ld as GS_PointLoad;
 
                   //string id_string = pl.LoadCase.ToString();
-                  string ref_string = pl.ReferencePointId > 0 ? "NODE" : "AUTO";
-                  string no_string = pl.ReferencePointId > 0 ? pl.ReferencePointId.ToString() : "-";
+                  string ref_string = (!(pl.ReferencePoint is null)) && pl.ReferencePoint.Id > 0 ? "NODE" : "AUTO";
+                  string no_string = (!(pl.ReferencePoint is null)) && pl.ReferencePoint.Id > 0 ? pl.ReferencePoint.Id.ToString() : "-";
                   int type_off = pl.UseHostLocal ? 3 : 0;
 
                   for (int i = 0; i < 3; ++i)
@@ -188,11 +188,11 @@ namespace gh_sofistik
                {
                   var ll = ld as GS_LineLoad;
 
-                  bool hosted = ll.ReferenceLineId > 0;
+                  bool hosted = (!(ll.ReferenceLine is null)) && ll.ReferenceLine.Id > 0;
 
                   string cmd_string = ll.Value.IsLinear() ? "LINE" : "CURV";
                   string ref_string = hosted ? "SLN" : "AUTO";
-                  string no_string = hosted ? ll.ReferenceLineId.ToString() : "-";
+                  string no_string = hosted ? ll.ReferenceLine.Id.ToString() : "-";
                   int type_off = ll.UseHostLocal ? 3 : 0;
 
                   var points = hosted ? new List<Point3d>() : GetCurvePolygon(ll.Value);
@@ -223,11 +223,11 @@ namespace gh_sofistik
                {
                   var al = ld as GS_AreaLoad;
 
-                  bool hosted = al.ReferenceAreaId > 0;
+                  bool hosted = (!(al.ReferenceArea is null)) && al.ReferenceArea.Id > 0;
 
                   string cmd_string = "AREA";
                   string ref_string = hosted ? "SAR" : "AUTO";
-                  string no_string = hosted ? al.ReferenceAreaId.ToString() : "-";
+                  string no_string = hosted ? al.ReferenceArea.Id.ToString() : "-";
                   int type_off = al.UseHostLocal ? 3 : 0;
 
                   foreach( var fc in al.Value.Faces )
@@ -339,8 +339,26 @@ namespace gh_sofistik
          return points;
       }
 
-
       private List<Point3d> GetFacePolygon(BrepFace fc)
+      {
+         List<Point3d> points = new List<Point3d>();
+         foreach (BrepTrim bt in fc.OuterLoop.Trims)
+         {
+            Curve crv = bt.Edge?.EdgeCurve;
+            if (!(crv is null))
+            {
+               List<Point3d>cList=GetCurvePolygon(crv);
+               foreach(Point3d cP in cList)
+               {
+                  if (!points.Contains(cP)) points.Add(cP);
+               }
+            }
+         }
+         return points;
+         //return GetCurvePolygon(fc.OuterLoop.Trims.To3dCurve());      // alternative version
+      }
+
+      /*private List<Point3d> GetFacePolygon(BrepFace fc)      //old version: adds multiple points
       {
          var points = new List<Point3d>();
 
@@ -360,6 +378,6 @@ namespace gh_sofistik
          }
 
          return points;
-      }
+      }*/
    }
 }

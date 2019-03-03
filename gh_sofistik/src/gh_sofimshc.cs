@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
+using gh_sofistik.src;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
@@ -11,8 +11,10 @@ namespace gh_sofistik
 {
    public class CreateSofimshcInput : GH_Component
    {
+      private BoundingBox _boundingBox=new BoundingBox();
+
       public CreateSofimshcInput()
-         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file","SOFiSTiK", "Structure")
+         : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file", "SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -28,11 +30,12 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
-         pManager.AddTextParameter("Control Values", "Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
-         pManager.AddNumberParameter("Intersection tolerance", "Tolg", "Geometric intersection tolerance", GH_ParamAccess.item, 0.01);
-         pManager.AddBooleanParameter("Create mesh", "Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
-         pManager.AddNumberParameter("Mesh density", "Hmin", "Allows to set the global mesh density (called Hmin in SOFiSTiK) in [m]", GH_ParamAccess.item, 1.0);
-         pManager.AddTextParameter("Text input", "Text", "Additional input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
+         pManager.AddBooleanParameter("Create mesh", "Create Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
+         pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 1.0);
+         pManager.AddNumberParameter("Intersection tolerance", "Tolerance", "Geometric intersection tolerance in [m]", GH_ParamAccess.item, 0.01);
+         pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned element numbers", GH_ParamAccess.item, 50000);
+         pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("Text input", "Add. Text", "Additional text input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -40,22 +43,49 @@ namespace gh_sofistik
          pManager.AddTextParameter("Text input", "O", "SOFiMSHC text input", GH_ParamAccess.item);
       }
 
+      public override void DrawViewportWires(IGH_PreviewArgs args)
+      {
+         base.DrawViewportWires(args);
+         
+         if (this.Attributes.Selected)
+            args.Display.DrawBox(_boundingBox, args.WireColour_Selected);         
+      }   
+
       protected override void SolveInstance(IGH_DataAccess da)
       {
-         string ctrl = da.GetData<string>(1);
-         double tolg = da.GetData<double>(2);
-         bool mesh = da.GetData<bool>(3);
-         double hmin = da.GetData<double>(4);
-         string text = da.GetData<string>(5);
+         bool mesh = da.GetData<bool>(1);
+         double hmin = da.GetData<double>(2);
+         double tolg = da.GetData<double>(3);
+         int idBorder = da.GetData<int>(4);
+         string ctrl = da.GetData<string>(5);
+         string text = da.GetData<string>(6);
 
          var structural_elements = new List<IGS_StructuralElement>();
-         foreach( var it in da.GetDataList<IGH_Goo>(0))
+         List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information = new List<GH_GeometricGoo<GH_CouplingStruc>>();
+
+         foreach (var it in da.GetDataList<IGH_Goo>(0))
          {
             if (it is IGS_StructuralElement)
                structural_elements.Add(it as IGS_StructuralElement);
+
+            else if (it is GH_GeometricGoo<GH_CouplingStruc>)
+               coupling_information.Add(it as GH_GeometricGoo<GH_CouplingStruc>);
+
             else
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_StructuralElement.");
          }
+
+         int id = idBorder;
+         SortedSet<int> idSet = new SortedSet<int>();
+         // assign auto generated IDs temporarily and write "Id=0" back at end of this method
+         List<IGS_StructuralElement> write_id_back_to_zero = new List<IGS_StructuralElement>();
+         id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
+         addUnknownElementsFromCouplings(id, idSet, structural_elements, coupling_information, write_id_back_to_zero);
+         
+         // build hashmap for couplings: for one id (key), you get a list of couplings in which this structural element is involved
+         Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMap = buildCouplingMap(coupling_information);
+
+         _boundingBox = new BoundingBox();
 
          var sb = new StringBuilder();
 
@@ -64,28 +94,30 @@ namespace gh_sofistik
          sb.AppendLine("PAGE UNII 0"); // export always in SOFiSTiK database units
          sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
          sb.AppendFormat("CTRL TOLG {0:F6}\n", tolg);
-         if(mesh)
+         if (mesh)
          {
             sb.AppendLine("CTRL MESH 1");
             sb.AppendFormat("CTRL HMIN {0:F3}\n", hmin);
          }
 
          // add control string
-         if(!string.IsNullOrEmpty(ctrl))
+         if (!string.IsNullOrEmpty(ctrl))
             sb.Append(ctrl);
          sb.AppendLine();
 
          // write structural lines
-         foreach( var se in structural_elements )
+         foreach (var se in structural_elements)
          {
-            if(se is GS_StructuralPoint)
+            if (se is GS_StructuralPoint)
             {
                var spt = se as GS_StructuralPoint;
                Point3d p = spt.Value.Location;
 
-               string id_string = spt.Id > 0 ? spt.Id.ToString() : "-";
+               _boundingBox.Union(spt.Boundingbox);
 
-               sb.AppendFormat("SPT {0} X {1:F8} {2:F8} {3:F8}",id_string, p.X, p.Y, p.Z);
+               string id_string = se.Id > 0 ? se.Id.ToString() : "-";
+
+               sb.AppendFormat("SPT {0} X {1:F8} {2:F8} {3:F8}", id_string, p.X, p.Y, p.Z);
 
                if (spt.DirectionLocalX.Length > 0.0)
                   sb.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalX.X, spt.DirectionLocalX.Y, spt.DirectionLocalX.Z);
@@ -97,13 +129,17 @@ namespace gh_sofistik
                   sb.AppendFormat(" FIX {0}", spt.FixLiteral);
 
                sb.AppendLine();
+
+               AppendCouplingInformation(sb, se, couplingMap);
             }
             // write structural lines
-            else if(se is GS_StructuralLine)
+            else if (se is GS_StructuralLine)
             {
                var sln = se as GS_StructuralLine;
 
-               string id_string = sln.Id > 0 ? sln.Id.ToString() : "-";
+               _boundingBox.Union(sln.Boundingbox);
+
+               string id_string = se.Id > 0 ? se.Id.ToString() : "-";
                string id_group = sln.GroupId > 0 ? sln.GroupId.ToString() : "-";
                string id_section = sln.SectionId > 0 ? sln.SectionId.ToString() : "-";
 
@@ -111,6 +147,8 @@ namespace gh_sofistik
 
                if (sln.DirectionLocalZ.Length > 0.0)
                   sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sln.DirectionLocalZ.X, sln.DirectionLocalZ.Y, sln.DirectionLocalZ.Z);
+               else
+                  sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", 0, 0, -1);
 
                if (string.IsNullOrWhiteSpace(sln.FixLiteral) == false)
                   sb.AppendFormat(" FIX {0}", sln.FixLiteral);
@@ -118,6 +156,8 @@ namespace gh_sofistik
                sb.AppendLine();
 
                AppendCurveGeometry(sb, sln.Value);
+
+               AppendCouplingInformation(sb, se, couplingMap);
             }
             // write structural areas
             else if (se is GS_StructuralArea)
@@ -125,7 +165,9 @@ namespace gh_sofistik
                var sar = se as GS_StructuralArea;
                var brep = sar.Value;
 
-               string id_string = sar.Id > 0 ? sar.Id.ToString() : "-";
+               _boundingBox.Union(sar.Boundingbox);
+
+               string id_string = se.Id > 0 ? se.Id.ToString() : "-";
                string grp_string = sar.GroupId > 0 ? sar.GroupId.ToString() : "-";
                string thk_string = sar.Thickness.ToString("F6");
 
@@ -135,12 +177,12 @@ namespace gh_sofistik
                brep.CullUnusedEdges();
 
                // loop over all faces within the brep
-               foreach( var fc in brep.Faces)
+               foreach (var fc in brep.Faces)
                {
                   // checks and preparations
                   fc.ShrinkFace(BrepFace.ShrinkDisableSide.ShrinkAllSides);
 
-                  if(fc.IsClosed(0) || fc.IsClosed(1))
+                  if (fc.IsClosed(0) || fc.IsClosed(1))
                   {
                      this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "A given Surface is closed in one direction.\nSuch surfaces cannot be handled by SOFiMSHC and need to be split.");
                   }
@@ -154,7 +196,7 @@ namespace gh_sofistik
                      sb.AppendFormat(" MNO {0}", sar.MaterialId.ToString());
                   if (sar.ReinforcementId > 0)
                      sb.AppendFormat(" MRF {0}", sar.ReinforcementId.ToString());
-                  if(sar.DirectionLocalX.Length > 1.0E-8)
+                  if (sar.DirectionLocalX.Length > 1.0E-8)
                   {
                      sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sar.DirectionLocalX.X, sar.DirectionLocalX.Y, sar.DirectionLocalX.Z);
                   }
@@ -165,7 +207,7 @@ namespace gh_sofistik
                   AppendSurfaceBoundary(sb, fc);
 
                   // write geometry
-                  if(fc.IsPlanar() == false)
+                  if (fc.IsPlanar() == false)
                   {
                      AppendSurfaceGeometry(sb, fc.ToNurbsSurface());
                   }
@@ -186,9 +228,248 @@ namespace gh_sofistik
          sb.AppendLine();
          sb.AppendLine("END");
 
+
+         foreach (IGS_StructuralElement se in write_id_back_to_zero)
+            se.Id = 0;
+
+
          da.SetData(0, sb.ToString());
       }
 
+      #region Id distribution and preprocessing
+
+      private int assignIDs(int id, SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<IGS_StructuralElement> write_id_back_to_zero)
+      {
+         // assign IDs to all StructuralElements which go into sofimshc and dont have an id yet
+         foreach (IGS_StructuralElement se in structural_elements)
+         {
+            if (se.Id == 0)
+            {
+               se.Id = ++id;
+               write_id_back_to_zero.Add(se);
+            }
+            idSet.Add(se.Id);
+         }
+         return id;
+      }
+
+      private int addUnknownElementsFromCouplings(int id, SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information, List<IGS_StructuralElement> write_id_back_to_zero)
+      {
+         // add StructuralElements to sofimshc which dont go directly into sofimshc but into something like Coupling and assign IDs if necessary
+         foreach (GH_GeometricGoo<GH_CouplingStruc> gg in coupling_information)
+         {
+            if (gg.Value.Reference_A.Id != 0)
+            {
+               if (!idSet.Contains(gg.Value.Reference_A.Id))
+               {
+                  structural_elements.Add(gg.Value.Reference_A);
+                  idSet.Add(gg.Value.Reference_A.Id);
+               }
+            }
+            else
+            {
+               gg.Value.Reference_A.Id = ++id;
+               write_id_back_to_zero.Add(gg.Value.Reference_A);
+               structural_elements.Add(gg.Value.Reference_A);
+               idSet.Add(gg.Value.Reference_A.Id);
+            }
+
+            if (gg.Value.Reference_B.Id != 0)
+            {
+               if (!idSet.Contains(gg.Value.Reference_B.Id))
+               {
+                  structural_elements.Add(gg.Value.Reference_B);
+                  idSet.Add(gg.Value.Reference_B.Id);
+               }
+            }
+            else
+            {
+               gg.Value.Reference_B.Id = ++id;
+               write_id_back_to_zero.Add(gg.Value.Reference_B);
+               structural_elements.Add(gg.Value.Reference_B);
+               idSet.Add(gg.Value.Reference_B.Id);
+            }
+         }
+         return id;
+      }
+
+      private Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> buildCouplingMap(List<GH_GeometricGoo<GH_CouplingStruc>> cpl_list)
+      {
+         Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> map = new Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>>();
+         foreach (GH_GeometricGoo<GH_CouplingStruc> gg in cpl_list)
+         {
+            if (!(gg.Value.Reference_A is null))
+            {
+               List<GH_GeometricGoo<GH_CouplingStruc>> csList_temp;
+               if (!map.TryGetValue(gg.Value.Reference_A.Id, out csList_temp))
+               {
+                  csList_temp = new List<GH_GeometricGoo<GH_CouplingStruc>>();
+                  map[gg.Value.Reference_A.Id] = csList_temp;
+               }
+               csList_temp.Add(gg);
+            }            
+         }
+         return map;
+      }
+
+      #endregion
+
+      #region Coupling processing
+
+      private void AppendCouplingInformation(StringBuilder sb, IGS_StructuralElement se, Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> map)
+      {
+         if (se.Id > 0)
+         {
+            List<GH_GeometricGoo<GH_CouplingStruc>> involvedCouplings;
+            if (map.TryGetValue(se.Id, out involvedCouplings))
+            {
+               if (se is GS_StructuralLine)
+                  AppendCouplingInformation_L(sb, involvedCouplings);
+               if (se is GS_StructuralPoint)
+                  AppendCouplingInformation_P(sb, involvedCouplings);
+            }
+         }
+      }
+
+      private void AppendCouplingInformation_L(StringBuilder sb, List<GH_GeometricGoo<GH_CouplingStruc>> l)
+      {
+         foreach (GH_GeometricGoo<GH_CouplingStruc> gg in l)
+         {
+            if (gg is GH_Coupling)
+               AppendCouplingInformation_CPL_Line(sb, (gg as GH_Coupling));
+            if (gg is GH_Spring)
+               AppendCouplingInformation_SPR_Line(sb, (gg as GH_Spring));
+         }
+      }
+
+      private void AppendCouplingInformation_P(StringBuilder sb, List<GH_GeometricGoo<GH_CouplingStruc>> l)
+      {
+         foreach (GH_GeometricGoo<GH_CouplingStruc> gg in l)
+         {
+            if (gg.Value.Reference_B is GS_StructuralLine)
+               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "no coupling/spring connection possible from point to line. please reverse input sequence. possible connections are: point-point, line-point, line-line");
+
+            if (gg is GH_Coupling)
+               AppendCouplingInformation_CPL_Point(sb, (gg as GH_Coupling));
+            if (gg is GH_Spring)
+               AppendCouplingInformation_SPR_Point(sb, (gg as GH_Spring));
+         }
+      }
+
+      private void AppendCouplingInformation_CPL_Point(StringBuilder sb, GH_Coupling cpl)
+      {
+         if (cpl.Value.Reference_B.Id > 0)
+         {
+            // SPTP takes only points as reference, no lines
+            if (cpl.Value.Reference_B is GS_StructuralPoint)
+            {
+
+               sb.AppendFormat(" SPTP");
+
+               if (!cpl.FixLiteral.Equals(""))
+                  sb.AppendFormat(" {0}", cpl.FixLiteral);
+               
+               sb.AppendFormat(" REF {0}", cpl.Value.Reference_B.Id);               
+
+               if(cpl.GroupId > 0)
+                  sb.AppendFormat(" GRP {0}", cpl.GroupId);
+
+               sb.AppendLine();
+
+            }
+         }
+      }
+
+      private void AppendCouplingInformation_CPL_Line(StringBuilder sb, GH_Coupling cpl)
+      {
+         if (cpl.Value.Reference_B.Id > 0)
+         {
+
+            sb.AppendFormat(" SLNS");
+
+            if (cpl.GroupId > 0)
+               sb.AppendFormat(" GRP {0}", cpl.GroupId);
+
+            if (!cpl.FixLiteral.Equals(""))
+               sb.AppendFormat(" FIX {0}", cpl.FixLiteral);
+
+            sb.Append(" REFT");
+
+            if (cpl.Value.IsBCurve)
+               sb.Append(" >SLN");
+            else
+               sb.Append(" >SPT");
+            
+            sb.AppendFormat(" {0}", cpl.Value.Reference_B.Id);
+
+            sb.AppendLine();
+
+         }
+      }
+
+      private void AppendCouplingInformation_SPR_Point(StringBuilder sb, GH_Spring spr)
+      {         
+
+         if (spr.Value.Reference_B.Id > 0)
+         {
+            // SPTS takes only points as reference, no lines
+            if (spr.Value.Reference_B is GS_StructuralPoint)
+            {
+
+               sb.AppendFormat(" SPTS REF {0}", spr.Value.Reference_B.Id);
+               
+
+               //sb.Append(" TYP 'C'");
+
+               sb.AppendFormat(" CP {0}", spr.Axial_stiffness);
+               sb.AppendFormat(" CM {0}", spr.Rotational_stiffness);
+
+               if (!spr.Direction.IsTiny())
+                  sb.AppendFormat(" DX {0} DY {1} DZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+
+               if (spr.GroupId > 0)
+                  sb.AppendFormat(" GRP {0}", spr.GroupId);
+
+               sb.AppendLine();
+
+            }
+         }
+      }
+      private void AppendCouplingInformation_SPR_Line(StringBuilder sb, GH_Spring spr)
+      {
+
+         if (spr.Value.Reference_B.Id > 0)
+         {
+
+            sb.AppendFormat(" SLNS");
+
+            if (spr.GroupId > 0)
+               sb.AppendFormat(" GRP {0}", spr.GroupId);
+
+            sb.Append(" REFT");
+
+            if (spr.Value.IsBCurve)
+               sb.Append(" >SLN");
+            else
+               sb.Append(" >SPT");
+            
+            sb.AppendFormat(" {0}", spr.Value.Reference_B.Id);
+
+
+            sb.AppendFormat(" CA {0}", spr.Axial_stiffness);
+            sb.AppendFormat(" CD {0}", spr.Rotational_stiffness);
+
+            if (!spr.Direction.IsTiny())
+               sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+            
+
+            sb.AppendLine();
+
+         }
+      }
+
+      #endregion
+      
       #region CURVE GEOMETRY
       private void AppendCurveGeometry(StringBuilder sb, LineCurve l)
       {
@@ -216,7 +497,7 @@ namespace gh_sofistik
 
       private void AppendCurveGeometry(StringBuilder sb, NurbsCurve n)
       {
-         if(n.Knots.Count == 2 && n.Degree == 1) // is a straight line: write as SLNB-record
+         if (n.Knots.Count == 2 && n.Degree == 1) // is a straight line: write as SLNB-record
          {
             var pa = n.PointAtStart;
             var pe = n.PointAtEnd;
@@ -278,13 +559,13 @@ namespace gh_sofistik
          {
             AppendCurveGeometry(sb, c as NurbsCurve);
          }
-         else if(c is PolylineCurve)
+         else if (c is PolylineCurve)
          {
             var n = (c as PolylineCurve).ToNurbsCurve();
-            if(n != null)
+            if (n != null)
                AppendCurveGeometry(sb, n);
          }
-         else if(c is PolyCurve)
+         else if (c is PolyCurve)
          {
             var n = (c as PolyCurve).ToNurbsCurve();
             if (n != null)
@@ -332,7 +613,7 @@ namespace gh_sofistik
          double vlength;
 
          // reparametrize to real world length to minimize distortion in the map from parameter space to 3D
-         if(ns.GetSurfaceSize(out ulength, out vlength))
+         if (ns.GetSurfaceSize(out ulength, out vlength))
          {
             ns.SetDomain(0, new Interval(0, ulength));
             ns.SetDomain(1, new Interval(1, vlength));
@@ -340,10 +621,10 @@ namespace gh_sofistik
 
          // write knot vectors
          bool first = true;
-         foreach( var ku in ns.KnotsU )
+         foreach (var ku in ns.KnotsU)
          {
             sb.AppendFormat(" SARN S {0:F8}", ku);
-            if(first)
+            if (first)
             {
                sb.AppendFormat(" DEGS {0}", ns.OrderU - 1);
                first = false;
@@ -364,20 +645,22 @@ namespace gh_sofistik
          }
 
          // write control points
-         for( int i=0; i<ns.Points.CountV; ++i)
+         for (int i = 0; i < ns.Points.CountV; ++i)
          {
-            for(int j=0; j<ns.Points.CountU; ++j)
+            for (int j = 0; j < ns.Points.CountU; ++j)
             {
                var cpt = ns.Points.GetControlPoint(j, i);
                double w = cpt.Weight;
 
                sb.AppendFormat(" SARP NURB {0} {1}", j + 1, i + 1);
-               sb.AppendFormat(" X {0:F8} {1:F8} {2:F8} {3:F8}", cpt.X/w, cpt.Y/w, cpt.Z/w, w);
+               sb.AppendFormat(" X {0:F8} {1:F8} {2:F8} {3:F8}", cpt.X / w, cpt.Y / w, cpt.Z / w, w);
                sb.AppendLine();
             }
          }
 
       }
+
       #endregion
    }
 }
+

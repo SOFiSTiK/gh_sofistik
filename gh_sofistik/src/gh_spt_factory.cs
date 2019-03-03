@@ -14,7 +14,7 @@ namespace gh_sofistik
 {
    public interface IGS_StructuralElement
    {
-      int Id { get; }
+      int Id { get; set; }
       string TypeName { get; }
    }
 
@@ -24,7 +24,25 @@ namespace gh_sofistik
       public int Id { get; set; } = 0;
       public Vector3d DirectionLocalX { get; set; } = new Vector3d();
       public Vector3d DirectionLocalZ { get; set; } = new Vector3d();
-      public string FixLiteral { get; set; } = string.Empty;
+
+      private SupportCondition _supp_condition = null;
+
+      private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+
+      private string fixLiteral = string.Empty;    
+
+      public string FixLiteral
+      {
+         get
+         {
+            return fixLiteral;
+         }
+         set
+         {
+            fixLiteral = value;
+            _supp_condition = new SupportCondition(fixLiteral);
+         }
+      }
 
       public override BoundingBox Boundingbox
       {
@@ -98,20 +116,107 @@ namespace gh_sofistik
 
       public BoundingBox ClippingBox
       {
-         get { return Boundingbox; }
+         get
+         {
+            if (fixLiteral.Equals(""))
+               return Value.GetBoundingBox(false);
+            else
+               return DrawUtil.GetClippingBoxSupports(Value.GetBoundingBox(false));
+         }
       }
 
       public void DrawViewportWires(GH_PreviewWireArgs args)
       {
-         if(Value != null)
+         //ClippingBox
+         //args.Pipeline.DrawBox(ClippingBox, System.Drawing.Color.Black);
+         if (Value != null)
          {
-            args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, System.Drawing.Color.Red);
+            System.Drawing.Color colStr = args.Color;
+            System.Drawing.Color colSup = args.Color;
+            if (!DrawUtil.CheckSelection(colStr))
+            {
+               colStr = DrawUtil.DrawColorStructuralElements;
+               colSup = System.Drawing.Color.Black;
+            }
+            else
+               drawLocalFrame(args.Pipeline);
+
+            args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, colStr);
+
+            drawSupportPoint(args.Pipeline, colSup, false);
          }
       }
 
       public void DrawViewportMeshes(GH_PreviewMeshArgs args)
       {
          // no need to draw meshes 
+         if (Value != null)
+         {
+            drawSupportPoint(args.Pipeline, DrawUtil.DrawColorSupports, true);
+         }
+      }
+
+      private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
+      {
+         if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
+         {
+            if (!_localFrame.isValid)
+               updateLocalFrameTransforms();
+            _localFrame.Draw(pipeline);
+         }
+      }
+
+      private void updateLocalFrameTransforms()
+      {
+         _localFrame.Transforms.Clear();
+
+         Transform tScale = Rhino.Geometry.Transform.Scale(Point3d.Origin, DrawUtil.ScaleFactorLocalFrame);
+
+         Vector3d lx = DirectionLocalX.IsTiny() ? Vector3d.XAxis : DirectionLocalX;
+         Vector3d lz = DirectionLocalZ.IsTiny() ? -1 * Vector3d.ZAxis : DirectionLocalZ;
+
+         Transform tFinal = TransformUtils.GetGlobalTransformPoint(lx, lz);
+
+         Transform tTranslate = Rhino.Geometry.Transform.Translation(new Vector3d(Value.Location));
+
+         tFinal = tTranslate * tFinal * tScale;
+
+         _localFrame.Transforms.Add(tFinal);
+      }
+
+      private void drawSupportPoint(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col, bool shaded)
+      {
+         if (DrawUtil.ScaleFactorSupports > 0.0001)
+         {
+            if (!_supp_condition.isValid)
+            {
+               updateSupportTransforms();
+            }
+            _supp_condition.Draw(pipeline, col, shaded);
+         }
+      }
+
+      private void updateSupportTransforms()
+      {
+         _supp_condition.Transforms.Clear();
+
+         Transform tScale = Rhino.Geometry.Transform.Scale(Point3d.Origin, DrawUtil.ScaleFactorSupports);
+
+         Vector3d lx = DirectionLocalX.IsTiny() ? Vector3d.XAxis : DirectionLocalX;
+         Vector3d lz = DirectionLocalZ.IsTiny() ? Vector3d.ZAxis : DirectionLocalZ;
+
+         Transform tFinal = Rhino.Geometry.Transform.Identity;
+
+         if (_supp_condition.LocalFrame)
+         {
+            tFinal = TransformUtils.GetGlobalTransformPoint(lx, lz);
+         }
+
+         Transform tTranslate = Rhino.Geometry.Transform.Translation(new Vector3d(Value.Location));
+
+         tFinal = tTranslate * tFinal * tScale;
+
+         _supp_condition.Transforms.Add(tFinal);
       }
 
       public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)

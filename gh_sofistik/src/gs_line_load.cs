@@ -12,14 +12,16 @@ using Rhino.Geometry;
 
 namespace gh_sofistik
 {
-   public class GS_LineLoad : GH_GeometricGoo<Curve>, IGS_Load
+   public class GS_LineLoad : GH_GeometricGoo<Curve>, IGS_Load, IGH_PreviewData
    {
       public int LoadCase { get; set; } = 0;
       public bool UseHostLocal { get; set; } = false;
       public Vector3d Forces { get; set; } = new Vector3d();
       public Vector3d Moments { get; set; } = new Vector3d();
 
-      public int ReferenceLineId { get; set; } = 0;
+      private LoadCondition _loadCondition = new LoadCondition();
+      
+      public GS_StructuralLine ReferenceLine { get; set; }
 
       public override string TypeName
       {
@@ -58,6 +60,13 @@ namespace gh_sofistik
          get { return Value.GetBoundingBox(true); }
       }
 
+      public BoundingBox ClippingBox
+      {
+         get {
+            return DrawUtil.GetClippingBoxLoads(Value.GetBoundingBox(false), Forces.Length, Moments.Length);
+         }
+      }
+
       public override BoundingBox GetBoundingBox(Transform xform)
       {
          return xform.TransformBoundingBox(Value.GetBoundingBox(true));
@@ -77,6 +86,47 @@ namespace gh_sofistik
          dup.Value.Transform(xform);
 
          return dup;
+      }
+
+      public void DrawViewportWires(GH_PreviewWireArgs args)
+      {
+         //draw clippingbox
+         //args.Pipeline.DrawBox(ClippingBox, System.Drawing.Color.Black);
+         if (!(Value is null))
+         {
+            System.Drawing.Color col = args.Color;
+            if (!DrawUtil.CheckSelection(col))
+               col = DrawUtil.DrawColorLoads;
+            args.Pipeline.DrawCurve(Value, col, args.Thickness+1);
+
+            if ( DrawUtil.ScaleFactorLoads > 0.0001 && !(Forces.IsTiny() && Moments.IsTiny()) )
+            {
+               if (!_loadCondition.isValid)
+               {
+                  updateLoadTransforms();
+               }
+               _loadCondition.Draw(args.Pipeline, col);
+            }
+         }
+      }
+
+      private void updateLoadTransforms()
+      {
+         _loadCondition = new LoadCondition(Forces, Moments);
+         Vector3d lz = Vector3d.Negate(Vector3d.ZAxis);   //default local z
+         if (!(ReferenceLine is null))
+         {
+            if (!ReferenceLine.DirectionLocalZ.IsTiny())
+            {
+               lz = ReferenceLine.DirectionLocalZ;
+            }
+         }
+         _loadCondition.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, UseHostLocal, lz, null, DrawUtil.ScaleFactorLoads, DrawUtil.DensityFactorLoads));
+      }
+
+      public void DrawViewportMeshes(GH_PreviewMeshArgs args)
+      {
+         //no meshes for arrows needed
       }
    }
 
@@ -115,9 +165,7 @@ namespace gh_sofistik
 
          var gs_line_loads = new List<GS_LineLoad>();
 
-         int max_count = Math.Max(curves.Count, loadcases.Count);
-
-         for (int i = 0; i < max_count; ++i)
+         for (int i = 0; i < curves.Count; ++i)
          {
             var curve = curves.GetItemOrLast(i);
 
@@ -129,14 +177,14 @@ namespace gh_sofistik
                UseHostLocal = hostlocals.GetItemOrLast(i)
             };
 
-            if(curve is GS_StructuralLine)
+            if (curve is GS_StructuralLine)
             {
                var sln = curve as GS_StructuralLine;
 
                ll.Value = sln.Value;
-               ll.ReferenceLineId = sln.Id; // pass id of structural line
+               ll.ReferenceLine = sln;  // pass reference of structural line
             }
-            else if(curve is GH_Curve)
+            else if (curve is GH_Curve)
             {
                ll.Value = (curve as GH_Curve).Value;
             }

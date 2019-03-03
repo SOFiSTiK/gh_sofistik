@@ -20,6 +20,9 @@ namespace gh_sofistik
       public double Thickness { get; set; } = 0.0;
       public Vector3d DirectionLocalX { get; set; } = new Vector3d();
 
+      private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+
+
       public override BoundingBox Boundingbox
       {
          get { return Value.GetBoundingBox(true); }
@@ -97,20 +100,72 @@ namespace gh_sofistik
 
       public BoundingBox ClippingBox
       {
-         get { return Boundingbox; }
+         get { return Value.GetBoundingBox(false); }
       }
 
       public void DrawViewportWires(GH_PreviewWireArgs args)
       {
+         //ClippingBox
+         //args.Pipeline.DrawBox(ClippingBox, System.Drawing.Color.Black);
          if (Value != null)
-         {
-            args.Pipeline.DrawBrepWires(Value, System.Drawing.Color.Red);
+         {  
+            System.Drawing.Color col = args.Color;
+            if(!DrawUtil.CheckSelection(col))
+               col = DrawUtil.DrawColorStructuralElements;
+            else
+               drawLocalFrame(args.Pipeline);
+
+            args.Pipeline.DrawBrepWires(Value, col, -1);
          }
       }
 
       public void DrawViewportMeshes(GH_PreviewMeshArgs args)
       {
-         //throw new NotImplementedException();
+         if (Value != null)
+         {  
+            System.Drawing.Color col = args.Material.Diffuse;
+            Rhino.Display.DisplayMaterial areaStrcMaterial = new Rhino.Display.DisplayMaterial(args.Material);
+            if (!DrawUtil.CheckSelection(col))
+            {
+               col = DrawUtil.DrawColorStructuralElements;
+
+               areaStrcMaterial.Diffuse = col;
+               areaStrcMaterial.Specular = col;
+               areaStrcMaterial.Emission = col;
+               areaStrcMaterial.BackDiffuse = col;
+               areaStrcMaterial.BackSpecular = col;
+               areaStrcMaterial.BackEmission = col;
+            }
+            
+            args.Pipeline.DrawBrepShaded(Value, areaStrcMaterial);
+         }
+      }
+
+      private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
+      {
+         if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
+         {
+            if (!_localFrame.isValid)
+            {
+               updateLocalFrameTransforms();
+            }
+            _localFrame.Draw(pipeline);
+         }
+      }
+
+      private void updateLocalFrameTransforms()
+      {
+         _localFrame.Transforms.Clear();
+
+         //   iterate over BrepFaces
+         foreach (BrepFace bf in Value.Faces)
+         {
+            //   iterate over Edges of current face and draw this edge
+            foreach (int beIndex in bf.AdjacentEdges())
+            {
+               _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value.Edges[beIndex], true, DirectionLocalX, bf, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
+            }
+         }
       }
 
       public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)

@@ -18,7 +18,25 @@ namespace gh_sofistik
       public int GroupId { get; set; } = 0;    
       public int SectionId { get; set; } = 0;
       public Vector3d DirectionLocalZ { get; set; } = new Vector3d();
-      public string FixLiteral { get; set; } = string.Empty;
+
+      private SupportCondition _supp_condition = null;
+
+      private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+
+      private string fixLiteral = string.Empty;
+
+      public string FixLiteral
+      {
+         get
+         {
+            return fixLiteral;
+         }
+         set
+         {
+            fixLiteral = value;
+            _supp_condition = new SupportCondition(fixLiteral);
+         }
+      }
 
       public override BoundingBox Boundingbox
       {
@@ -81,20 +99,86 @@ namespace gh_sofistik
 
       public BoundingBox ClippingBox
       {
-         get { return Boundingbox; }
+         get
+         {
+            if (fixLiteral.Equals(""))
+               return Value.GetBoundingBox(false);
+            else
+               return DrawUtil.GetClippingBoxSupports(Value.GetBoundingBox(false));
+         }
       }
 
       public void DrawViewportWires(GH_PreviewWireArgs args)
       {
-         if(Value != null)
-         {
-            args.Pipeline.DrawCurve(Value, System.Drawing.Color.Red);
+         //ClippingBox
+         //args.Pipeline.DrawBox(ClippingBox, System.Drawing.Color.Black);
+         if (Value != null)
+         {            
+            System.Drawing.Color colStr = args.Color;
+            System.Drawing.Color colSup = args.Color;
+            if (!DrawUtil.CheckSelection(colStr))
+            {
+               colStr = DrawUtil.DrawColorStructuralElements;
+               colSup = System.Drawing.Color.Black;
+            }
+            else
+               drawLocalFrame(args.Pipeline);
+
+            args.Pipeline.DrawCurve(Value, colStr, args.Thickness+1);
+
+            drawSupportLine(args.Pipeline, colSup, false);            
          }
       }
 
       public void DrawViewportMeshes(GH_PreviewMeshArgs args)
       {
          // no need to draw meshes
+         if (Value != null)
+         {
+            drawSupportLine(args.Pipeline, DrawUtil.DrawColorSupports, true);
+         }
+      }
+
+      private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
+      {
+         if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
+         {
+            if (!_localFrame.isValid)
+            {
+               updateLocalFrameTransforms();
+            }
+            _localFrame.Draw(pipeline);
+         }
+      }
+
+      private void updateLocalFrameTransforms()
+      {
+         _localFrame.Transforms.Clear();
+
+         var dz = DirectionLocalZ.IsTiny() ? -1 * Vector3d.ZAxis : DirectionLocalZ;
+
+         _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, true, dz, null, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
+      }
+
+      private void drawSupportLine(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col, bool shaded)
+      {
+         if (DrawUtil.ScaleFactorSupports > 0.0001)
+         {
+            if (!_supp_condition.isValid)
+            {
+               updateSupportTransforms();
+            }
+            _supp_condition.Draw(pipeline, col, shaded);
+         }
+      }
+
+      private void updateSupportTransforms()
+      {
+         _supp_condition.Transforms.Clear();
+
+         var dz = DirectionLocalZ.IsTiny() ? Vector3d.ZAxis : DirectionLocalZ;
+
+         _supp_condition.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, _supp_condition.LocalFrame, dz, null, DrawUtil.ScaleFactorSupports, DrawUtil.DensityFactorSupports));
       }
 
       public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)
