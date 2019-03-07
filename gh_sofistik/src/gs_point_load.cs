@@ -115,7 +115,7 @@ namespace gh_sofistik
             System.Drawing.Color col = args.Color;
             if(!DrawUtil.CheckSelection(col))
                col = DrawUtil.DrawColorLoads;
-            args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, col);
+            args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, DrawUtil.DrawColorLoads);
 
             if (!(Forces.IsTiny() && Moments.IsTiny()) && DrawUtil.ScaleFactorLoads > 0.0001) {
                if (!_loadCondition.isValid)
@@ -166,7 +166,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_point_load_16; } // TODO
+         get { return Properties.Resources.structural_point_load_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -197,31 +197,37 @@ namespace gh_sofistik
          {
             var point = points.GetItemOrLast(i);
 
-            var pl = new GS_PointLoad()
+            if (!(point is null))
             {
-               LoadCase = loadcases.GetItemOrLast(i),
-               Forces = forces.GetItemOrLast(i),
-               Moments = moments.GetItemOrLast(i),
-               UseHostLocal = hostlocals.GetItemOrLast(i)
-            };
+               var pl = new GS_PointLoad()
+               {
+                  LoadCase = loadcases.GetItemOrLast(i),
+                  Forces = forces.GetItemOrLast(i),
+                  Moments = moments.GetItemOrLast(i),
+                  UseHostLocal = hostlocals.GetItemOrLast(i)
+               };
 
-            if (point is GS_StructuralPoint)
-            {
-               var spt = point as GS_StructuralPoint;
+               bool addPoint = true;
+               if (point is GS_StructuralPoint)
+               {
+                  var spt = point as GS_StructuralPoint;
 
-               pl.Value = spt.Value; 
-               pl.ReferencePoint = spt; // pass reference of structural point
-            }
-            else if (point is GH_Point)
-            {
-               pl.Value = new Point((point as GH_Point).Value);
-            }
-            else
-            {
-               throw new Exception("Unable to Cast input to Point Geometry");
-            }
+                  pl.Value = spt.Value;
+                  pl.ReferencePoint = spt; // pass reference of structural point
+               }
+               else if (point is GH_Point)
+               {
+                  pl.Value = new Point((point as GH_Point).Value);
+               }
+               else
+               {
+                  AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to Cast input to Point Geometry");
+                  addPoint = false;
+               }
 
-            gs_point_loads.Add(pl);
+               if (addPoint)
+                  gs_point_loads.Add(pl);
+            }
          }
          da.SetDataList(0, gs_point_loads);
       }

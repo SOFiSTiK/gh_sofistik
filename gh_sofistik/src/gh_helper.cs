@@ -212,9 +212,21 @@ namespace gh_sofistik
          return bBox;
       }
 
-      public static BoundingBox GetClippingBoxSupports(BoundingBox bBox)
+      public static BoundingBox GetClippingBoxLocalframe(BoundingBox bBox)
       {
-         bBox.Inflate(0.25*scaleFactorSupports);
+         bBox.Inflate(ScaleFactorLocalFrame);
+         return bBox;
+      }
+
+      public static BoundingBox GetClippingBoxSuppLocal(BoundingBox bBox)
+      {
+         bBox.Inflate(Math.Max(0.25 * ScaleFactorSupports, ScaleFactorLocalFrame));
+         return bBox;
+      }
+
+      public static BoundingBox GetClippingBoxSupport(BoundingBox bBox)
+      {
+         bBox.Inflate(0.25 * ScaleFactorSupports);
          return bBox;
       }
 
@@ -234,20 +246,11 @@ namespace gh_sofistik
             Transform t = Transform.Identity;
             if (uhl) //transform needed
             {
-               if (bf is null) t = TransformUtils.GetGlobalTransformLine(crv.TangentAt(s), localDir); //setup transform for single curve, no brepFace
+               if (bf is null)
+                  t = TransformUtils.GetGlobalTransformLine(crv.TangentAt(s), localDir); //setup transform for single curve, no brepFace
                else
-               {
-                  Plane plane = TransformUtils.GetPlaneAtAreaPoint(crv.PointAt(s), bf);
-
-                  Vector3d dx = localDir;
-                  if (localDir.IsTiny() || !(plane.ZAxis.IsParallelTo(localDir, 0.0001) == 0))
-                     dx = plane.XAxis;
-                  
-                  // orient towards global negative z (own weight)
-                  Vector3d dz = (Vector3d.ZAxis * plane.ZAxis > 0) ? -1 * plane.ZAxis : plane.ZAxis;
-
-                  t = TransformUtils.GetGlobalTransformPoint(dx, dz); //setup transform for edge of brepFace
-               }
+                  t = TransformUtils.GetGlobalTransformArea(crv.PointAt(s), bf, localDir); //setup transform for edge of brepFace
+               
             }
             
             Transform tTranslate = Rhino.Geometry.Transform.Translation(new Vector3d(crv.PointAt(s)));
@@ -330,7 +333,22 @@ namespace gh_sofistik
          Plane oPlane = new Plane();
          bf.FrameAt(u, v, out oPlane);
          return oPlane;
-      }      
+      }    
+      
+      public static Transform GetGlobalTransformArea(Point3d areaPoint, BrepFace bf, Vector3d refLX)
+      {
+         Plane plane = GetPlaneAtAreaPoint(areaPoint, bf);
+
+         Vector3d dx = refLX;
+         if (dx.IsTiny() || !(plane.ZAxis.IsParallelTo(dx, 0.0001) == 0))
+            dx = plane.XAxis;
+
+         // orient towards global negative z (own weight)
+         Vector3d dz = (Vector3d.ZAxis * plane.ZAxis > 0) ? -1 * plane.ZAxis : plane.ZAxis;
+
+         return GetGlobalTransformPoint(dx, dz);
+
+      }
 
       public static Transform GetGlobalTransformLine(Vector3d tangent, Vector3d refLZ)
       {
@@ -828,6 +846,8 @@ namespace gh_sofistik
 
       public bool LocalFrame { get; set; } = false;
 
+      public bool HasSupport { get; set; } = true;
+
       private Symbol _symbol;
 
       private double _scale = 0;
@@ -838,44 +858,49 @@ namespace gh_sofistik
       {
          CreateSymbol(fixLiteral);
       }
-      
+
       public void CreateSymbol(string fixLiteral)
       {
-         _symbol = new Symbol();
          bool[,,] fixBits = DrawUtil.ParseFixString(fixLiteral);
          int countP = countDirections(fixBits, 0);
          int countM = countDirections(fixBits, 1);
-         Transform tp = getSupportOrientation(fixBits, 0);
-         Transform tm = getSupportOrientation(fixBits, 1);
 
-         if (countM == 3 && countP > 0)
-         {  
-            if (countP == 3)
-               _symbol.CreateCube(tp, true);
-            else
-            {
-               _symbol.CreatePyramid(tp);
-               _symbol.CreateFixationLines(tp, 3 - countP);
-               _symbol.CreateCube(tp, false);
-            }
-         }
+         if (countP == 0 && countM == 0)
+            HasSupport = false;
          else
          {
-            if (countP > 0)
+            _symbol = new Symbol();
+            Transform tp = getSupportOrientation(fixBits, 0);
+            Transform tm = getSupportOrientation(fixBits, 1);
+            if (countM == 3 && countP > 0)
             {
-               _symbol.CreatePyramid(tp);
-               _symbol.CreateFixationLines(tp, 3 - countP);               
-            }
-            if (countM > 0)
-            {
-               if (countM == 1)
-                  _symbol.CreateFork(tm);
-               if (countM == 2)
-                  _symbol.CreateCylinder(tm, false);
-               if (countM == 3)
+               if (countP == 3)
+                  _symbol.CreateCube(tp, true);
+               else
                {
-                  _symbol.CreateFork(tm);
-                  _symbol.CreateCylinder(tm, true);
+                  _symbol.CreatePyramid(tp);
+                  _symbol.CreateFixationLines(tp, 3 - countP);
+                  _symbol.CreateCube(tp, false);
+               }
+            }
+            else
+            {
+               if (countP > 0)
+               {
+                  _symbol.CreatePyramid(tp);
+                  _symbol.CreateFixationLines(tp, 3 - countP);
+               }
+               if (countM > 0)
+               {
+                  if (countM == 1)
+                     _symbol.CreateFork(tm);
+                  if (countM == 2)
+                     _symbol.CreateCylinder(tm, false);
+                  if (countM == 3)
+                  {
+                     _symbol.CreateFork(tm);
+                     _symbol.CreateCylinder(tm, true);
+                  }
                }
             }
          }
@@ -939,102 +964,163 @@ namespace gh_sofistik
 
    class CouplingCondition
    {
-      private List<Line> _lines;
-      private double _density;
-      private Point3d _mid;
-
-      public bool isValid
+      public interface ISymbol
       {
-         get
+         void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col);
+      }
+
+      private class Coupling_Symbol : ISymbol
+      {   // zeichnet ketten
+         private List<Curve> _crvs;
+
+         public Coupling_Symbol(Line line)
          {
-            if (Math.Abs(_density - DrawUtil.DensityFactorLoads) > 0.0001)
+            _crvs = new List<Curve>();
+
+            int elements = (int)Math.Ceiling(line.Length / DrawUtil.ScaleFactorSupports);
+
+            Transform t = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, line.To - line.From);
+            Transform tz = Rhino.Geometry.Transform.RotationZYX(Math.PI * 0.5, 0, 0);
+
+
+            for (int i = 0; i < elements; i++)
             {
-               _density = DrawUtil.DensityFactorSupports;
-               return false;
+               List<Point3d> points = new List<Point3d>();
+               points.Add(new Point3d(-1, 0, 1));
+               points.Add(new Point3d(0, 0, 0));
+               points.Add(new Point3d(1, 0, 1));
+               points.Add(new Point3d(1, 0, 2));
+               points.Add(new Point3d(0, 0, 3));
+               points.Add(new Point3d(-1, 0, 2));
+               points.Add(new Point3d(-1, 0, 1));
+               Curve crv = Curve.CreateInterpolatedCurve(points, 3);
+               crv.Scale(0.4 * DrawUtil.ScaleFactorSupports);
+               if (i % 2 == 1)
+                  crv.Transform(tz);
+               crv.Transform(t);
+               crv.Translate(new Vector3d(line.From + i * (line.To - line.From) / elements));
+               _crvs.Add(crv);
             }
-            return _lines.Count != 0;
+         }
+
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+         {
+            //pipeline.DrawPatternedLine(_line, col, 0x00110101, 3);
+            foreach (Curve crv in _crvs)
+            {
+               pipeline.DrawCurve(crv, col);
+            }
          }
       }
 
-      public CouplingCondition()
-      {
-         _lines = new List<Line>();
-         _density = 0;
-         _mid = new Point3d();
-      }
+      private class CouplingSpring_Symbol : ISymbol
+      {   // zeichnet ausgerichtete feder/helix zwischen zwei punkten
+         private Line _lineStart;
+         private Line _lineEnd;
+         private Curve crv;
 
-      public void CreateCouplingSymbols(List<Line> lines)
-      {
-         _lines = lines;
-
-         Vector3d v_mid = new Vector3d();
-         foreach (Line l in _lines)
+         public CouplingSpring_Symbol(Line line, Vector3d dir)
          {
-            v_mid += new Vector3d(l.From);
-            v_mid += new Vector3d(l.To);
-         }
-         v_mid /= (2*_lines.Count);
-         _mid = new Point3d(v_mid);
-      }
-
-      public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
-      {
-         foreach(Line l in _lines)
-            pipeline.DrawPatternedLine(l, col, 0x00110101, 3);         
-      }
-
-      public void DrawInfo(Rhino.Display.DisplayPipeline pipeline, String s)
-      {
-         pipeline.Draw2dText(s, System.Drawing.Color.Black, _mid, true);
-      }
-   }
-
-   class SpringCondition
-   {
-      private class Symbol_spring
-      {
-         Curve crv;
-         int thickness;
-         
-         public Symbol_spring(Line line, double axial_stiffness, double rotational_stiffness)
-         {
-            Vector3d lz = line.To - line.From;
+            Vector3d lz = dir.IsTiny() ? (line.To - line.From) : dir;
+            lz.Unitize();
             Transform t = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, lz);
+
+            Point3d mid = (line.From + line.To) * 0.5;
+            Point3d springstart = mid + lz * -0.5 * line.Length * 0.318;
+            Point3d springend = mid + lz * 0.5 * line.Length * 0.318;
+
+            double springLength = springstart.DistanceTo(springend);
+            _lineStart = new Line(line.From, springstart);
+            _lineEnd = new Line(line.To, springend);
+            if (line.From.DistanceTo(springend) < line.From.DistanceTo(springstart))
+            {
+               _lineStart.To = springend;
+               _lineEnd.To = springstart;
+            }
+
 
             int pointsPerPeriod = 4;
             double prescale = 0.2;
+            int periods = (int)Math.Ceiling(2 * springLength);
 
-            double axial_stiffnessAdjusted = axial_stiffness;
-            double rotational_stiffnessAdjusted = rotational_stiffness;
-            if (axial_stiffness < 0.1) axial_stiffnessAdjusted = 0.1;
-            if (rotational_stiffness < 0.1) rotational_stiffnessAdjusted = 0.1;
-
-            int periods = (int)((1 / Math.Log(1 + axial_stiffnessAdjusted)) * line.Length * DrawUtil.DensityFactorSupports);
-            
             List<Point3d> points = new List<Point3d>();
             points.Add(Point3d.Origin);
             for (int j = 0; j < periods; j++)
                for (int k = 0; k < pointsPerPeriod; k++)
-                  points.Add(new Point3d(DrawUtil.ScaleFactorSupports * prescale * Math.Cos(k * 2 * Math.PI/pointsPerPeriod)/line.Length, DrawUtil.ScaleFactorSupports * prescale * Math.Sin(k * 2 * Math.PI / pointsPerPeriod)/line.Length, (((double)(j)+((double)(k)/pointsPerPeriod))/periods)));
-            points.Add(new Point3d(0,0,1));
+                  points.Add(new Point3d(DrawUtil.ScaleFactorSupports * prescale * Math.Cos(k * 2 * Math.PI / pointsPerPeriod), DrawUtil.ScaleFactorSupports * prescale * Math.Sin(k * 2 * Math.PI / pointsPerPeriod), springLength * (((double)(j) + ((double)(k) / pointsPerPeriod)) / periods)));
+            points.Add(new Point3d(0, 0, springLength));
 
-            crv = Curve.CreateInterpolatedCurve(points,3);
-            crv.Scale(line.Length);
+            crv = Curve.CreateInterpolatedCurve(points, 3);
+
             crv.Transform(t);
-            crv.Translate(new Vector3d(line.From));
-
-            thickness = (int) Math.Ceiling(Math.Log(1+ rotational_stiffnessAdjusted * DrawUtil.ScaleFactorSupports));
+            crv.Translate(new Vector3d(springstart));
          }
 
-         public void Draw(Rhino.Display.DisplayPipeline pipeline)
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
          {
-            pipeline.DrawCurve(crv, DrawUtil.DrawColorSupports, thickness);
+            pipeline.DrawLine(_lineStart, col, 2);
+            pipeline.DrawLine(_lineEnd, col, 2);
+            pipeline.DrawCurve(crv, col, 2);
          }
       }
 
-      private List<Symbol_spring> _symbols;
+      private class Spring_Symbol : ISymbol
+      {   // zeichnet auflager feder/helix
+         private Curve crv;
+
+         public Spring_Symbol(Point3d pt, Vector3d dir)
+         {
+            int pointsPerPeriod = 4;
+            double prescaleXY = 0.5;
+            double prescale = 0.2;
+            int periods = 3;
+
+            List<Point3d> points = new List<Point3d>();
+            points.Add(Point3d.Origin);
+            for (int j = 0; j < periods; j++)
+               for (int k = 0; k < pointsPerPeriod; k++)
+                  points.Add(new Point3d(prescaleXY * Math.Cos(k * 2 * Math.PI / pointsPerPeriod), prescaleXY * Math.Sin(k * 2 * Math.PI / pointsPerPeriod), (((double)(j) + ((double)(k) / pointsPerPeriod)) / periods)));
+            points.Add(new Point3d(0, 0, 1));
+
+            crv = Curve.CreateInterpolatedCurve(points, 3);
+
+            crv.Translate(new Vector3d(0,0,-1));
+
+
+            crv.Scale(prescale * DrawUtil.ScaleFactorSupports);
+            
+            if (!dir.IsTiny())
+               crv.Transform(TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, dir));
+
+            crv.Translate(new Vector3d(pt));
+         }
+
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+         {          
+            pipeline.DrawCurve(crv, col, 2);
+         }
+      }
+
+      private class DottedLine_Symbol : ISymbol
+      {
+         private Line _line;
+
+         public DottedLine_Symbol(Line line)
+         {
+            _line = line;
+         }
+
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+         {
+            pipeline.DrawPatternedLine(_line, col, 0x00110101, 3);
+         }
+      }
+
+      private List<ISymbol> _symbols;
       private double _density;
       private double _scale;
+      private Point3d[] _mid_points;
+      private List<string> _sList;
 
       public bool isValid
       {
@@ -1054,26 +1140,82 @@ namespace gh_sofistik
          }
       }
 
-      public SpringCondition()
+      public CouplingCondition()
       {
-         _symbols = new List<Symbol_spring>();
-         _density = 0;
-         _scale = 0;
-      }      
-
-      public void createSpringSymbols(List<Line> ll, double axial_stiffness, double rotational_stiffness)
-      {
-         foreach(Line l in ll)
-         {
-            Symbol_spring s = new Symbol_spring(l, axial_stiffness, rotational_stiffness);
-            _symbols.Add(s);
-         }
+         _symbols = new List<ISymbol>();
+         _density = DrawUtil.DensityFactorSupports;
+         _scale = DrawUtil.ScaleFactorSupports;         
       }
 
-      public void Draw(Rhino.Display.DisplayPipeline pipeline)
+      public void CreateCouplingSymbols(List<Line> lines, List<string> info)
       {
-         foreach (Symbol_spring s in _symbols)
-            s.Draw(pipeline);
+         createInfo(lines, info);
+
+         foreach (Line l in lines)
+            _symbols.Add(new Coupling_Symbol(l));
+      }
+
+      public void CreateCouplingSpringSymbols(List<Line> lines, List<string> info, Vector3d dir)
+      {
+         createInfo(lines, info);
+
+         foreach (Line l in lines)
+            _symbols.Add(new CouplingSpring_Symbol(l, dir));
+      }
+
+      public void CreateSpringSymbols(List<Point3d> points, List<string> info, Vector3d dir)
+      {
+         List<Line> ll = new List<Line>();
+         ll.Add(new Line(points[0], points[points.Count-1]));
+         createInfo(ll, info);
+
+         foreach (Point3d pt in points)
+            _symbols.Add(new Spring_Symbol(pt, dir));
+      }
+
+      public void CreateDottedLineSymbols(List<Line> lines, List<string> info)
+      {
+         createInfo(lines, info);
+
+         foreach (Line l in lines)
+            _symbols.Add(new DottedLine_Symbol(l));
+      }
+
+      private void createInfo(List<Line> lines, List<string> info)
+      {
+         _mid_points = new Point3d[4];
+
+         _mid_points[0] = (lines[0].From + lines[0].To) * 0.5;
+         _mid_points[1] = (lines[lines.Count - 1].From + lines[lines.Count - 1].To) * 0.5;
+         _mid_points[2] = (lines[0].From + lines[lines.Count - 1].From) * 0.5;
+         _mid_points[3] = (lines[0].To + lines[lines.Count - 1].To) * 0.5;
+
+         _sList = info;
+      }
+
+      public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+      {
+         foreach (ISymbol s in _symbols)
+            s.Draw(pipeline, col);
+      }
+
+      public void DrawInfo(GH_PreviewWireArgs args)
+      {
+         //pipeline.Draw2dText(s, System.Drawing.Color.Black, _mid, true);
+         Point2d mid_2d = args.Viewport.WorldToClient(_mid_points[0]);
+         for (int j = 1; j < _mid_points.Length; j++)
+         {
+            Point2d p2d = args.Viewport.WorldToClient(_mid_points[j]);
+            if (p2d.X < mid_2d.X)
+               mid_2d = p2d;
+         }
+
+         int i = 0;
+         foreach (string s in _sList)
+         {
+            args.Pipeline.DrawDot((float)mid_2d.X - 50, (float)(mid_2d.Y + (i - (_sList.Count - 1) / 2) * 20), s, System.Drawing.Color.Green, System.Drawing.Color.Black);
+            i++;
+         }
       }
    }
 

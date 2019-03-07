@@ -18,10 +18,13 @@ namespace gh_sofistik
       public int MaterialId { get; set; } = 0;
       public int ReinforcementId { get; set; } = 0;
       public double Thickness { get; set; } = 0.0;
-      public Vector3d DirectionLocalX { get; set; } = new Vector3d();
+      public Vector3d DirectionLocalX { get; set; } = new Vector3d();      
+      public string Alignment { get; set; } = "CENT";
+      public string MeshOptions { get; set; } = "AUTO";      
+      public double ElementSize { get; set; } = 0.0;
+      public string UserText { get; set; } = string.Empty;
 
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
-
 
       public override BoundingBox Boundingbox
       {
@@ -53,7 +56,11 @@ namespace gh_sofistik
             MaterialId = this.MaterialId,
             ReinforcementId = this.ReinforcementId,
             Thickness = this.Thickness,
-            DirectionLocalX = this.DirectionLocalX
+            DirectionLocalX = this.DirectionLocalX,
+            Alignment = this.Alignment,
+            MeshOptions = this.MeshOptions,
+            ElementSize = this.ElementSize,
+            UserText = this.UserText
          };
       }
 
@@ -100,7 +107,7 @@ namespace gh_sofistik
 
       public BoundingBox ClippingBox
       {
-         get { return Value.GetBoundingBox(false); }
+         get { return DrawUtil.GetClippingBoxLocalframe(Value.GetBoundingBox(false)); }
       }
 
       public void DrawViewportWires(GH_PreviewWireArgs args)
@@ -157,10 +164,48 @@ namespace gh_sofistik
       {
          _localFrame.Transforms.Clear();
 
-         //   iterate over BrepFaces
+         Transform tScale = Rhino.Geometry.Transform.Scale(Point3d.Origin, DrawUtil.ScaleFactorLocalFrame);
+
          foreach (BrepFace bf in Value.Faces)
          {
-            //   iterate over Edges of current face and draw this edge
+            int n_seg_u = Math.Max(1, (int)(bf.Domain(0).Length * DrawUtil.DensityFactorLocalFrame));
+            int n_seg_v = Math.Max(1, (int)(bf.Domain(1).Length * DrawUtil.DensityFactorLocalFrame));
+
+            for (int i = 0; i <= n_seg_v; i++)
+            {
+               for (int j = 0; j <= n_seg_u; j++)
+               {
+
+                  double para_u = bf.Domain(0).ParameterAt((double)j / (double)n_seg_u);
+                  double para_v = bf.Domain(1).ParameterAt((double)i / (double)n_seg_v);
+
+                  if (DrawUtil.DensityFactorLocalFrame < 0.001)
+                  {
+                     para_u = bf.Domain(0).ParameterAt(0.5);
+                     para_v = bf.Domain(1).ParameterAt(0.5);
+                  }
+
+                  Point3d ap = bf.PointAt(para_u, para_v);
+
+
+                  Transform t = TransformUtils.GetGlobalTransformArea(ap, bf, DirectionLocalX);
+
+                  Transform tTranslate = Rhino.Geometry.Transform.Translation(new Vector3d(ap));
+
+
+
+                  _localFrame.Transforms.Add(tTranslate * t * tScale);
+               }
+            }
+         }
+      }
+
+      private void updateLocalFrameTransformsOld()
+      {
+         _localFrame.Transforms.Clear();
+         
+         foreach (BrepFace bf in Value.Faces)
+         {
             foreach (int beIndex in bf.AdjacentEdges())
             {
                _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value.Edges[beIndex], true, DirectionLocalX, bf, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
@@ -218,7 +263,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_area16; }
+         get { return Properties.Resources.structural_area_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -230,6 +275,10 @@ namespace gh_sofistik
          pManager.AddIntegerParameter("Material", "Material", "Material number", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("ReinforcementMaterial", "ReinfMat", "Reinforcement material number", GH_ParamAccess.list, 0);
          pManager.AddVectorParameter("Dir x", "Dir x", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddTextParameter("Alignment", "Alignment", "Alignment of the volume in relation to the surface area (Centered = default, Above, Below)", GH_ParamAccess.list, "Centered");
+         pManager.AddTextParameter("Mesh Options", "Mesh Options", "Mesh Options for the SOFiSTiK FE meshing (Automatic = default, Regular, Single Quad, Deactivate)", GH_ParamAccess.list, "Automatic");
+         pManager.AddNumberParameter("Element Size", "Element Size", "Size of FE elements [m]", GH_ParamAccess.list, 0.0);
+         pManager.AddTextParameter("User Text", "User Text", "Custom User Text to be passed to the SOFiSTiK input", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -246,6 +295,10 @@ namespace gh_sofistik
          var materials = da.GetDataList<int>(4);
          var matreinfs = da.GetDataList<int>(5);
          var xdirs = da.GetDataList<Vector3d>(6);
+         var alignment = da.GetDataList<string>(7);
+         var meshOptions = da.GetDataList<string>(8);
+         var elementSize = da.GetDataList<double>(9);
+         var userText = da.GetDataList<string>(10);
 
          var gh_structural_areas = new List<GS_StructuralArea>();
 
@@ -253,20 +306,63 @@ namespace gh_sofistik
          {
             var b = breps[i];
 
-            var ga = new GS_StructuralArea()
+            if (!(b is null))
             {
-               Value = b,
-               Id = ids.GetItemOrCountUp(i),
-               GroupId = groups.GetItemOrLast(i),
-               MaterialId = materials.GetItemOrLast(i),
-               ReinforcementId = matreinfs.GetItemOrLast(i),
-               Thickness = thicknss.GetItemOrLast(i),
-               DirectionLocalX = xdirs.GetItemOrLast(i)
-            };
-            gh_structural_areas.Add(ga);
+               var ga = new GS_StructuralArea()
+               {
+                  Value = b,
+                  Id = ids.GetItemOrCountUp(i),
+                  GroupId = groups.GetItemOrLast(i),
+                  MaterialId = materials.GetItemOrLast(i),
+                  ReinforcementId = matreinfs.GetItemOrLast(i),
+                  Thickness = thicknss.GetItemOrLast(i),
+                  DirectionLocalX = xdirs.GetItemOrLast(i),
+                  Alignment = parseAlignmentString(alignment.GetItemOrLast(i)),
+                  MeshOptions = parseMeshOptionsString(meshOptions.GetItemOrLast(i)),
+                  ElementSize = elementSize.GetItemOrLast(i),
+                  UserText = userText.GetItemOrLast(i)
+               };
+               gh_structural_areas.Add(ga);
+            }
          }
 
          da.SetDataList(0, gh_structural_areas);
+      }
+
+      private string parseAlignmentString(string s)
+      {
+         string slow = s.Trim().ToLower();
+
+         string res = "CENT";
+         if (slow.Equals("centered"))
+            res = "CENT";
+         else if (slow.Equals("above"))
+            res = "ABOV";
+         else if (slow.Equals("below"))
+            res = "BELO";
+         else
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Alignment string is not valid. default value \"Centered\" will be used");
+
+         return res;
+      }
+
+      private string parseMeshOptionsString(string s)
+      {
+         string slow = s.Trim().ToLower();
+
+         string res = "AUTO";
+         if(slow.Equals("automatic"))
+            res = "AUTO";
+         else if (slow.Equals("regular"))
+            res = "REGM";
+         else if (slow.Equals("single quad") || slow.Equals("singlequad"))
+            res = "SNGQ";
+         else if (slow.Equals("deactivate"))
+            res = "OFF";
+         else
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Mesh Options string is not valid. default value \"Automatic\" will be used");
+
+         return res;
       }
 
       public override Guid ComponentGuid

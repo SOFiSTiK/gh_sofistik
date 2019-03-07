@@ -86,6 +86,15 @@ namespace gh_sofistik
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMap = buildCouplingMap(coupling_information);
 
          _boundingBox = new BoundingBox();
+         if (structural_elements.Count > 0) {
+            IGS_StructuralElement se = structural_elements[0];
+            if (se is GS_StructuralPoint)
+               _boundingBox = (se as GS_StructuralPoint).Boundingbox;
+            else if (se is GS_StructuralLine)
+               _boundingBox = (se as GS_StructuralLine).Boundingbox;
+            else if (se is GS_StructuralArea)
+               _boundingBox = (se as GS_StructuralArea).Boundingbox;
+         }
 
          var sb = new StringBuilder();
 
@@ -119,14 +128,17 @@ namespace gh_sofistik
 
                sb.AppendFormat("SPT {0} X {1:F8} {2:F8} {3:F8}", id_string, p.X, p.Y, p.Z);
 
-               if (spt.DirectionLocalX.Length > 0.0)
+               if (spt.DirectionLocalX.Length > 1.0E-8)
                   sb.AppendFormat(" SX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalX.X, spt.DirectionLocalX.Y, spt.DirectionLocalX.Z);
 
-               if (spt.DirectionLocalZ.Length > 0.0)
+               if (spt.DirectionLocalZ.Length > 1.0E-8)
                   sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6}", spt.DirectionLocalZ.X, spt.DirectionLocalZ.Y, spt.DirectionLocalZ.Z);
 
                if (string.IsNullOrWhiteSpace(spt.FixLiteral) == false)
                   sb.AppendFormat(" FIX {0}", spt.FixLiteral);
+
+               if (string.IsNullOrWhiteSpace(spt.UserText) == false)
+                  sb.AppendFormat(" {0}", spt.UserText);
 
                sb.AppendLine();
 
@@ -145,13 +157,21 @@ namespace gh_sofistik
 
                sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, id_group, id_section);
 
-               if (sln.DirectionLocalZ.Length > 0.0)
+               if (sln.DirectionLocalZ.Length > 1.0E-8)
                   sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sln.DirectionLocalZ.X, sln.DirectionLocalZ.Y, sln.DirectionLocalZ.Z);
                else
                   sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", 0, 0, -1);
 
                if (string.IsNullOrWhiteSpace(sln.FixLiteral) == false)
                   sb.AppendFormat(" FIX {0}", sln.FixLiteral);
+
+               sb.AppendFormat(" STYP {0}", sln.ElementType);
+
+               if(Math.Abs(sln.ElementSize) > 1.0E-8)
+                  sb.AppendFormat(" SDIV {0}", sln.ElementSize);
+
+               if (string.IsNullOrWhiteSpace(sln.UserText) == false)
+                  sb.AppendFormat(" {0}", sln.UserText);
 
                sb.AppendLine();
 
@@ -200,6 +220,18 @@ namespace gh_sofistik
                   {
                      sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sar.DirectionLocalX.X, sar.DirectionLocalX.Y, sar.DirectionLocalX.Z);
                   }
+
+                  if(!sar.Alignment.Equals("CENT"))
+                     sb.AppendFormat(" QREF {0}", sar.Alignment);
+
+                  if(!sar.MeshOptions.Equals("AUTO"))
+                     sb.AppendFormat(" MCTL {0}", sar.MeshOptions);
+
+                  if(Math.Abs(sar.ElementSize) > 1.0E-8)
+                     sb.AppendFormat(" H1 {0}", sar.ElementSize);
+
+                  if (string.IsNullOrWhiteSpace(sar.UserText) == false)
+                     sb.AppendFormat(" {0}", sar.UserText);
 
                   sb.AppendLine();
 
@@ -274,20 +306,23 @@ namespace gh_sofistik
                idSet.Add(gg.Value.Reference_A.Id);
             }
 
-            if (gg.Value.Reference_B.Id != 0)
+            if (!(gg.Value.Reference_B is null))
             {
-               if (!idSet.Contains(gg.Value.Reference_B.Id))
+               if (gg.Value.Reference_B.Id != 0)
                {
+                  if (!idSet.Contains(gg.Value.Reference_B.Id))
+                  {
+                     structural_elements.Add(gg.Value.Reference_B);
+                     idSet.Add(gg.Value.Reference_B.Id);
+                  }
+               }
+               else
+               {
+                  gg.Value.Reference_B.Id = ++id;
+                  write_id_back_to_zero.Add(gg.Value.Reference_B);
                   structural_elements.Add(gg.Value.Reference_B);
                   idSet.Add(gg.Value.Reference_B.Id);
                }
-            }
-            else
-            {
-               gg.Value.Reference_B.Id = ++id;
-               write_id_back_to_zero.Add(gg.Value.Reference_B);
-               structural_elements.Add(gg.Value.Reference_B);
-               idSet.Add(gg.Value.Reference_B.Id);
             }
          }
          return id;
@@ -325,7 +360,7 @@ namespace gh_sofistik
             {
                if (se is GS_StructuralLine)
                   AppendCouplingInformation_L(sb, involvedCouplings);
-               if (se is GS_StructuralPoint)
+               else if (se is GS_StructuralPoint)
                   AppendCouplingInformation_P(sb, involvedCouplings);
             }
          }
@@ -337,7 +372,9 @@ namespace gh_sofistik
          {
             if (gg is GH_Coupling)
                AppendCouplingInformation_CPL_Line(sb, (gg as GH_Coupling));
-            if (gg is GH_Spring)
+            else if (gg is GH_Elastic_Coupling)
+               AppendCouplingInformation_ECPL_Line(sb, (gg as GH_Elastic_Coupling));
+            else if (gg is GH_Spring)
                AppendCouplingInformation_SPR_Line(sb, (gg as GH_Spring));
          }
       }
@@ -347,11 +384,13 @@ namespace gh_sofistik
          foreach (GH_GeometricGoo<GH_CouplingStruc> gg in l)
          {
             if (gg.Value.Reference_B is GS_StructuralLine)
-               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "no coupling/spring connection possible from point to line. please reverse input sequence. possible connections are: point-point, line-point, line-line");
+               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "no coupling connection possible from point to line. please reverse input sequence. possible connections are: point-point, line-point, line-line");
 
             if (gg is GH_Coupling)
                AppendCouplingInformation_CPL_Point(sb, (gg as GH_Coupling));
-            if (gg is GH_Spring)
+            else if (gg is GH_Elastic_Coupling)
+               AppendCouplingInformation_ECPL_Point(sb, (gg as GH_Elastic_Coupling));
+            else if (gg is GH_Spring)
                AppendCouplingInformation_SPR_Point(sb, (gg as GH_Spring));
          }
       }
@@ -407,60 +446,60 @@ namespace gh_sofistik
          }
       }
 
-      private void AppendCouplingInformation_SPR_Point(StringBuilder sb, GH_Spring spr)
+      private void AppendCouplingInformation_ECPL_Point(StringBuilder sb, GH_Elastic_Coupling ecpl)
       {         
 
-         if (spr.Value.Reference_B.Id > 0)
+         if (ecpl.Value.Reference_B.Id > 0)
          {
             // SPTS takes only points as reference, no lines
-            if (spr.Value.Reference_B is GS_StructuralPoint)
+            if (ecpl.Value.Reference_B is GS_StructuralPoint)
             {
 
-               sb.AppendFormat(" SPTS REF {0}", spr.Value.Reference_B.Id);
+               sb.AppendFormat(" SPTS REF {0}", ecpl.Value.Reference_B.Id);
                
 
                //sb.Append(" TYP 'C'");
 
-               sb.AppendFormat(" CP {0}", spr.Axial_stiffness);
-               sb.AppendFormat(" CM {0}", spr.Rotational_stiffness);
+               sb.AppendFormat(" CP {0}", ecpl.Axial_stiffness);
+               sb.AppendFormat(" CM {0}", ecpl.Rotational_stiffness);
 
-               if (!spr.Direction.IsTiny())
-                  sb.AppendFormat(" DX {0} DY {1} DZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+               if (!ecpl.Direction.IsTiny())
+                  sb.AppendFormat(" DX {0} DY {1} DZ {2}", ecpl.Direction.X, ecpl.Direction.Y, ecpl.Direction.Z);
 
-               if (spr.GroupId > 0)
-                  sb.AppendFormat(" GRP {0}", spr.GroupId);
+               if (ecpl.GroupId > 0)
+                  sb.AppendFormat(" GRP {0}", ecpl.GroupId);
 
                sb.AppendLine();
 
             }
          }
       }
-      private void AppendCouplingInformation_SPR_Line(StringBuilder sb, GH_Spring spr)
+      private void AppendCouplingInformation_ECPL_Line(StringBuilder sb, GH_Elastic_Coupling ecpl)
       {
 
-         if (spr.Value.Reference_B.Id > 0)
+         if (ecpl.Value.Reference_B.Id > 0)
          {
 
             sb.AppendFormat(" SLNS");
 
-            if (spr.GroupId > 0)
-               sb.AppendFormat(" GRP {0}", spr.GroupId);
+            if (ecpl.GroupId > 0)
+               sb.AppendFormat(" GRP {0}", ecpl.GroupId);
 
             sb.Append(" REFT");
 
-            if (spr.Value.IsBCurve)
+            if (ecpl.Value.IsBCurve)
                sb.Append(" >SLN");
             else
                sb.Append(" >SPT");
             
-            sb.AppendFormat(" {0}", spr.Value.Reference_B.Id);
+            sb.AppendFormat(" {0}", ecpl.Value.Reference_B.Id);
 
 
-            sb.AppendFormat(" CA {0}", spr.Axial_stiffness);
-            sb.AppendFormat(" CD {0}", spr.Rotational_stiffness);
+            sb.AppendFormat(" CA {0}", ecpl.Axial_stiffness);
+            sb.AppendFormat(" CD {0}", ecpl.Rotational_stiffness);
 
-            if (!spr.Direction.IsTiny())
-               sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+            if (!ecpl.Direction.IsTiny())
+               sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", ecpl.Direction.X, ecpl.Direction.Y, ecpl.Direction.Z);
             
 
             sb.AppendLine();
@@ -468,8 +507,42 @@ namespace gh_sofistik
          }
       }
 
+      private void AppendCouplingInformation_SPR_Point(StringBuilder sb, GH_Spring spr)
+      {
+         sb.Append(" SPTS");
+
+         //sb.Append(" TYP 'C'");
+
+         sb.AppendFormat(" CP {0}", spr.Axial_stiffness);
+         sb.AppendFormat(" CM {0}", spr.Rotational_stiffness);
+
+         if (!spr.Direction.IsTiny())
+            sb.AppendFormat(" DX {0} DY {1} DZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+
+         if (spr.GroupId > 0)
+            sb.AppendFormat(" GRP {0}", spr.GroupId);
+
+         sb.AppendLine();
+      }
+
+      private void AppendCouplingInformation_SPR_Line(StringBuilder sb, GH_Spring spr)
+      {
+         sb.AppendFormat(" SLNS");
+
+         if (spr.GroupId > 0)
+            sb.AppendFormat(" GRP {0}", spr.GroupId);
+
+         sb.AppendFormat(" CA {0}", spr.Axial_stiffness);
+         sb.AppendFormat(" CD {0}", spr.Rotational_stiffness);
+
+         if (!spr.Direction.IsTiny())
+            sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
+
+         sb.AppendLine();
+      }
+
       #endregion
-      
+
       #region CURVE GEOMETRY
       private void AppendCurveGeometry(StringBuilder sb, LineCurve l)
       {

@@ -131,25 +131,23 @@ namespace gh_sofistik
             }
          }
       }
-   
+
 
       public void DrawViewportMeshes(GH_PreviewMeshArgs args)
       {
          if (!(Value is null))
          {
-            System.Drawing.Color col = args.Material.Diffuse;
             Rhino.Display.DisplayMaterial areaLoadMaterial = new Rhino.Display.DisplayMaterial(args.Material);
-            if (!DrawUtil.CheckSelection(col))               
-            {
-               col = DrawUtil.DrawColorLoads;
 
-               areaLoadMaterial.Diffuse = col;
-               areaLoadMaterial.Specular = col;
-               areaLoadMaterial.Emission = col;
-               areaLoadMaterial.BackDiffuse = col;
-               areaLoadMaterial.BackSpecular = col;
-               areaLoadMaterial.BackEmission = col;
-            }
+            System.Drawing.Color col = DrawUtil.DrawColorLoads;
+
+            areaLoadMaterial.Diffuse = col;
+            areaLoadMaterial.Specular = col;
+            areaLoadMaterial.Emission = col;
+            areaLoadMaterial.BackDiffuse = col;
+            areaLoadMaterial.BackSpecular = col;
+            areaLoadMaterial.BackEmission = col;
+
             args.Pipeline.DrawBrepShaded(Value, areaLoadMaterial);
          }
       }
@@ -163,7 +161,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofistik_24; } // TODO
+         get { return Properties.Resources.structural_area_load_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -196,31 +194,37 @@ namespace gh_sofistik
          {
             var area = areas.GetItemOrLast(i);
 
-            var ll = new GS_AreaLoad()
+            if (!(area is null))
             {
-               LoadCase = loadcases.GetItemOrLast(i),
-               Forces = forces.GetItemOrLast(i),
-               Moments = moments.GetItemOrLast(i),
-               UseHostLocal = hostlocals.GetItemOrLast(i)
-            };
+               var ll = new GS_AreaLoad()
+               {
+                  LoadCase = loadcases.GetItemOrLast(i),
+                  Forces = forces.GetItemOrLast(i),
+                  Moments = moments.GetItemOrLast(i),
+                  UseHostLocal = hostlocals.GetItemOrLast(i)
+               };
 
-            if(area is GS_StructuralArea)
-            {
-               var sar = area as GS_StructuralArea;
+               bool addArea = true;
+               if (area is GS_StructuralArea)
+               {
+                  var sar = area as GS_StructuralArea;
 
-               ll.Value = sar.Value;
-               ll.ReferenceArea = sar; // pass reference of structural area
-            }
-            else if (area is GH_GeometricGoo<Brep>)
-            {
-               ll.Value = (area as GH_GeometricGoo<Brep>).Value;
-            }
-            else
-            {
-               throw new Exception("Unable to Cast input to Curve Geometry");    //exception for surface, no exception for surface in sar_factory
-            }
+                  ll.Value = sar.Value;
+                  ll.ReferenceArea = sar; // pass reference of structural area
+               }
+               else if (area is GH_GeometricGoo<Brep>)
+               {
+                  ll.Value = (area as GH_GeometricGoo<Brep>).Value;
+               }
+               else
+               {
+                  AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to Cast input to Brep Geometry");
+                  addArea = false;
+               }
 
-            gs_area_loads.Add(ll);
+               if (addArea)
+                  gs_area_loads.Add(ll);
+            }
          }
 
          da.SetDataList(0, gs_area_loads);

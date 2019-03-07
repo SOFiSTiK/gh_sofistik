@@ -97,7 +97,7 @@ namespace gh_sofistik
             System.Drawing.Color col = args.Color;
             if (!DrawUtil.CheckSelection(col))
                col = DrawUtil.DrawColorLoads;
-            args.Pipeline.DrawCurve(Value, col, args.Thickness+1);
+            args.Pipeline.DrawCurve(Value, DrawUtil.DrawColorLoads, args.Thickness+1);
 
             if ( DrawUtil.ScaleFactorLoads > 0.0001 && !(Forces.IsTiny() && Moments.IsTiny()) )
             {
@@ -138,7 +138,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_line_load_16; } // TODO
+         get { return Properties.Resources.structural_line_load_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -169,39 +169,45 @@ namespace gh_sofistik
          {
             var curve = curves.GetItemOrLast(i);
 
-            var ll = new GS_LineLoad()
+            if (!(curve is null))
             {
-               LoadCase = loadcases.GetItemOrLast(i),
-               Forces = forces.GetItemOrLast(i),
-               Moments = moments.GetItemOrLast(i),
-               UseHostLocal = hostlocals.GetItemOrLast(i)
-            };
+               var ll = new GS_LineLoad()
+               {
+                  LoadCase = loadcases.GetItemOrLast(i),
+                  Forces = forces.GetItemOrLast(i),
+                  Moments = moments.GetItemOrLast(i),
+                  UseHostLocal = hostlocals.GetItemOrLast(i)
+               };
 
-            if (curve is GS_StructuralLine)
-            {
-               var sln = curve as GS_StructuralLine;
+               bool addCurve = true;
+               if (curve is GS_StructuralLine)
+               {
+                  var sln = curve as GS_StructuralLine;
 
-               ll.Value = sln.Value;
-               ll.ReferenceLine = sln;  // pass reference of structural line
-            }
-            else if (curve is GH_Curve)
-            {
-               ll.Value = (curve as GH_Curve).Value;
-            }
-            else if (curve is GH_Line)
-            {
-               ll.Value = new LineCurve((curve as GH_Line).Value);
-            }
-            else if (curve is GH_Arc)
-            {
-               ll.Value = new ArcCurve((curve as GH_Arc).Value);
-            }
-            else
-            {
-               throw new Exception("Unable to Cast input to Curve Geometry");
-            }
+                  ll.Value = sln.Value;
+                  ll.ReferenceLine = sln;  // pass reference of structural line
+               }
+               else if (curve is GH_Curve)
+               {
+                  ll.Value = (curve as GH_Curve).Value;
+               }
+               else if (curve is GH_Line)
+               {
+                  ll.Value = new LineCurve((curve as GH_Line).Value);
+               }
+               else if (curve is GH_Arc)
+               {
+                  ll.Value = new ArcCurve((curve as GH_Arc).Value);
+               }
+               else
+               {
+                  AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to Cast input to Curve Geometry");
+                  addCurve = false;
+               }
 
-            gs_line_loads.Add(ll);
+               if (addCurve)
+                  gs_line_loads.Add(ll);
+            }
          }
 
          da.SetDataList(0, gs_line_loads);

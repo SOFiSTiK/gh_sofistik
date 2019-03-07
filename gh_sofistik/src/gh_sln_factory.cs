@@ -17,14 +17,8 @@ namespace gh_sofistik
       public int Id { get; set; } = 0;
       public int GroupId { get; set; } = 0;    
       public int SectionId { get; set; } = 0;
-      public Vector3d DirectionLocalZ { get; set; } = new Vector3d();
-
-      private SupportCondition _supp_condition = null;
-
-      private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
-
+      public Vector3d DirectionLocalZ { get; set; } = new Vector3d();      
       private string fixLiteral = string.Empty;
-
       public string FixLiteral
       {
          get
@@ -36,7 +30,14 @@ namespace gh_sofistik
             fixLiteral = value;
             _supp_condition = new SupportCondition(fixLiteral);
          }
-      }
+      }      
+      public string ElementType { get; set; }= "B";
+      public double ElementSize { get; set; } = 0.0;
+      public string UserText { get; set; } = string.Empty;
+
+      private SupportCondition _supp_condition = null;
+      private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+
 
       public override BoundingBox Boundingbox
       {
@@ -67,7 +68,10 @@ namespace gh_sofistik
             GroupId = this.GroupId,
             SectionId = this.SectionId,
             DirectionLocalZ = this.DirectionLocalZ,
-            FixLiteral = this.FixLiteral
+            FixLiteral = this.FixLiteral,
+            ElementType = this.ElementType,
+            ElementSize = this.ElementSize,
+            UserText = this.UserText
          };
       }
 
@@ -102,9 +106,9 @@ namespace gh_sofistik
          get
          {
             if (fixLiteral.Equals(""))
-               return Value.GetBoundingBox(false);
+               return DrawUtil.GetClippingBoxLocalframe(Value.GetBoundingBox(false));
             else
-               return DrawUtil.GetClippingBoxSupports(Value.GetBoundingBox(false));
+               return DrawUtil.GetClippingBoxSuppLocal(Value.GetBoundingBox(false));
          }
       }
 
@@ -157,12 +161,25 @@ namespace gh_sofistik
 
          var dz = DirectionLocalZ.IsTiny() ? -1 * Vector3d.ZAxis : DirectionLocalZ;
 
-         _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, true, dz, null, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
+         if (DrawUtil.DensityFactorLocalFrame < 0.001)
+         {
+            double p = Value.Domain.ParameterAt(0.5);
+            Point3d pMid = Value.PointAt(p);
+            Vector3d tMid = Value.TangentAt(p);
+            Transform tScale = Rhino.Geometry.Transform.Scale(Point3d.Origin, DrawUtil.ScaleFactorLocalFrame);
+            Transform tOri = TransformUtils.GetGlobalTransformLine(tMid, dz);
+            Transform tTrans = Rhino.Geometry.Transform.Translation(new Vector3d(pMid));
+            _localFrame.Transforms.Add(tTrans * tOri * tScale);
+         }
+         else
+         {
+            _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, true, dz, null, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
+         }  
       }
 
       private void drawSupportLine(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col, bool shaded)
       {
-         if (DrawUtil.ScaleFactorSupports > 0.0001)
+         if (DrawUtil.ScaleFactorSupports > 0.0001 && _supp_condition.HasSupport)
          {
             if (!_supp_condition.isValid)
             {
@@ -240,7 +257,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_line16; }
+         get { return Properties.Resources.structural_line_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -251,6 +268,9 @@ namespace gh_sofistik
          pManager.AddIntegerParameter("Section", "Section", "Identifier of cross section", GH_ParamAccess.list, 0);
          pManager.AddVectorParameter("Dir Z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("Element Type", "Element Type", "Element Type of this structural line (Beam = default, Truss, Cable)", GH_ParamAccess.list, "Beam");
+         pManager.AddNumberParameter("Element Size", "Element Size", "Size of FE elements [m]", GH_ParamAccess.list, 0.0);
+         pManager.AddTextParameter("User Text", "User Text", "Custom User Text to be passed to the SOFiSTiK input", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -265,7 +285,10 @@ namespace gh_sofistik
          var groups = da.GetDataList<int>(2);
          var sections = da.GetDataList<int>(3);
          var zdirs = da.GetDataList<Vector3d>(4);
-         var fixations = da.GetDataList<string>(5); 
+         var fixations = da.GetDataList<string>(5);
+         var elementType = da.GetDataList<string>(6);
+         var elementSize = da.GetDataList<double>(7);
+         var userText = da.GetDataList<string>(8);
 
          var gh_structural_curves = new List<GS_StructuralLine>();
 
@@ -273,19 +296,42 @@ namespace gh_sofistik
          {
             var c = curves[i];
 
-            var gc = new GS_StructuralLine()
+            if (!(c is null))
             {
-               Value = c,
-               Id = identifiers.GetItemOrCountUp(i),
-               GroupId = groups.GetItemOrLast(i),
-               SectionId = sections.GetItemOrLast(i),
-               DirectionLocalZ = zdirs.GetItemOrLast(i),
-               FixLiteral = fixations.GetItemOrLast(i)
-            };
-            gh_structural_curves.Add(gc);
+               var gc = new GS_StructuralLine()
+               {
+                  Value = c,
+                  Id = identifiers.GetItemOrCountUp(i),
+                  GroupId = groups.GetItemOrLast(i),
+                  SectionId = sections.GetItemOrLast(i),
+                  DirectionLocalZ = zdirs.GetItemOrLast(i),
+                  FixLiteral = fixations.GetItemOrLast(i),
+                  ElementType = parseElementTypeString(elementType.GetItemOrLast(i)),
+                  ElementSize = elementSize.GetItemOrLast(i),
+                  UserText = userText.GetItemOrLast(i)
+               };
+               gh_structural_curves.Add(gc);
+            }
          }
 
          da.SetDataList(0, gh_structural_curves);
+      }
+
+      private string parseElementTypeString(string s)
+      {
+         string slow = s.Trim().ToLower();
+
+         string res = "B";
+         if (slow.Equals("beam"))
+            res = "B";
+         else if (slow.Equals("truss"))
+            res = "T";
+         else if (slow.Equals("cable"))
+            res = "C";
+         else
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Element Type string is not valid. default value \"Beam\" will be used");
+
+         return res;
       }
 
       public override Guid ComponentGuid

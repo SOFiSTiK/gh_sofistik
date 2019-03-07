@@ -61,6 +61,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="src\gh_spring.cs" />
+    <Compile Include="src\gh_elastic_coupling.cs" />
     <Compile Include="src\gh_calculate.cs" />
     <Compile Include="src\gh_coupling.cs" />
     <Compile Include="src\gh_create_axis.cs" />
@@ -78,8 +79,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>PublicResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
       <SubType>Designer</SubType>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -147,6 +148,57 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\img\sofimshc01.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_point_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_line_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_area_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_spring_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_constraint_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_point_load_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_line_load_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\user_options_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_area_load_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\file_dat_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_axis_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\loadcase_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofimshc.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofiload.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofimshc_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\sofiload_24x24.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\img\structural_elastic_constraint_24x24.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

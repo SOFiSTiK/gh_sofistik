@@ -63,9 +63,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap calculate_24x24 {
+        public static System.Drawing.Bitmap file_dat_24x24 {
             get {
-                object obj = ResourceManager.GetObject("calculate_24x24", resourceCulture);
+                object obj = ResourceManager.GetObject("file_dat_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -76,6 +76,16 @@ namespace gh_sofistik.Properties {
         public static System.Drawing.Bitmap folder_open_icon_16x16 {
             get {
                 object obj = ResourceManager.GetObject("folder_open_icon_16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap loadcase_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("loadcase_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -103,9 +113,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap sofistik_24 {
+        public static System.Drawing.Bitmap structural_area_24x24 {
             get {
-                object obj = ResourceManager.GetObject("sofistik_24", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_area_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -113,9 +123,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap structural_area16 {
+        public static System.Drawing.Bitmap structural_area_load_24x24 {
             get {
-                object obj = ResourceManager.GetObject("structural_area16", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_area_load_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -123,9 +133,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap structural_line_load_16 {
+        public static System.Drawing.Bitmap structural_axis_24x24 {
             get {
-                object obj = ResourceManager.GetObject("structural_line_load_16", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_axis_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -133,9 +143,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap structural_line16 {
+        public static System.Drawing.Bitmap structural_constraint_24x24 {
             get {
-                object obj = ResourceManager.GetObject("structural_line16", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_constraint_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -143,9 +153,9 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap structural_point_load_16 {
+        public static System.Drawing.Bitmap structural_elastic_constraint_24x24 {
             get {
-                object obj = ResourceManager.GetObject("structural_point_load_16", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_elastic_constraint_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -153,9 +163,59 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        public static System.Drawing.Bitmap structural_point16 {
+        public static System.Drawing.Bitmap structural_line_24x24 {
             get {
-                object obj = ResourceManager.GetObject("structural_point16", resourceCulture);
+                object obj = ResourceManager.GetObject("structural_line_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap structural_line_load_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("structural_line_load_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap structural_point_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("structural_point_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap structural_point_load_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("structural_point_load_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap structural_spring_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("structural_spring_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap user_options_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("user_options_24x24", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

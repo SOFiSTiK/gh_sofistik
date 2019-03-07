@@ -19,6 +19,11 @@ namespace gh_sofistik
          : base("Geometric Axis","Geom Axis", "Creates a SOFiSTiK geometry axis definition from a curve","SOFiSTiK","Geometry")
       {}
 
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.structural_axis_24x24; }
+      }
+
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddCurveParameter("Curve", "Crv", "Curve Geometry", GH_ParamAccess.list);

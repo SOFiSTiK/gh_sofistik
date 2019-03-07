@@ -29,7 +29,9 @@ namespace gh_sofistik
 
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
 
-      private string fixLiteral = string.Empty;    
+      public string UserText { get; set; } = string.Empty;
+
+      private string fixLiteral = string.Empty;
 
       public string FixLiteral
       {
@@ -72,7 +74,8 @@ namespace gh_sofistik
             Id = this.Id,
             DirectionLocalX = this.DirectionLocalX,
             DirectionLocalZ = this.DirectionLocalZ,
-            FixLiteral = this.FixLiteral
+            FixLiteral = this.FixLiteral,
+            UserText = this.UserText
          };
       }
 
@@ -119,9 +122,9 @@ namespace gh_sofistik
          get
          {
             if (fixLiteral.Equals(""))
-               return Value.GetBoundingBox(false);
+               return DrawUtil.GetClippingBoxLocalframe(Value.GetBoundingBox(false));
             else
-               return DrawUtil.GetClippingBoxSupports(Value.GetBoundingBox(false));
+               return DrawUtil.GetClippingBoxSuppLocal(Value.GetBoundingBox(false));
          }
       }
 
@@ -186,7 +189,7 @@ namespace gh_sofistik
 
       private void drawSupportPoint(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col, bool shaded)
       {
-         if (DrawUtil.ScaleFactorSupports > 0.0001)
+         if (DrawUtil.ScaleFactorSupports > 0.0001 && _supp_condition.HasSupport)
          {
             if (!_supp_condition.isValid)
             {
@@ -272,7 +275,7 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_point16; }
+         get { return Properties.Resources.structural_point_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -282,6 +285,7 @@ namespace gh_sofistik
          pManager.AddVectorParameter("Dir x", "Dir x", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddVectorParameter("Dir z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("User Text", "User Text", "Custom User Text to be passed to the SOFiSTiK input", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -296,6 +300,7 @@ namespace gh_sofistik
          var xdirs = da.GetDataList<Vector3d>(2);
          var zdirs = da.GetDataList<Vector3d>(3);
          var fixations = da.GetDataList<string>(4);
+         var userText = da.GetDataList<string>(5);
 
          var gh_structural_points = new List<GS_StructuralPoint>();
 
@@ -309,7 +314,8 @@ namespace gh_sofistik
                Id = identifiers.GetItemOrCountUp(i),
                DirectionLocalX = xdirs.GetItemOrLast(i),
                DirectionLocalZ = zdirs.GetItemOrLast(i),
-               FixLiteral = fixations.GetItemOrLast(i)
+               FixLiteral = fixations.GetItemOrLast(i),
+               UserText = userText.GetItemOrLast(i)
             };
             gh_structural_points.Add(gp);
          }

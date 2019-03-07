@@ -1,41 +1,35 @@
-﻿using Grasshopper.Kernel;
+﻿using System;
+using System.Collections.Generic;
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Rhino;
+using Rhino.DocObjects;
 
 namespace gh_sofistik.src
 {
-
    public class GH_Spring : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
    {
-      private CouplingCondition _springCond = new CouplingCondition();
-
       public int GroupId { get; set; } = 0;
 
       public double Axial_stiffness { get; set; } = 0.0;
 
       public double Rotational_stiffness { get; set; } = 0.0;
 
-      public Vector3d Direction { get; set; } = new Vector3d();
+      public Vector3d Direction { get; set; } = new Vector3d(0,0,1);
+
+      private CouplingCondition _cplCond = new CouplingCondition();
 
       public BoundingBox ClippingBox
       {
          get
          {
-            BoundingBox bBox = new BoundingBox();
+            BoundingBox bBox;
             if (Value.IsACurve)
-               bBox.Union(Value.CurveA.GetBoundingBox(false));
+               bBox = Value.CurveA.GetBoundingBox(false);
             else
-               bBox.Union(Value.PointA.GetBoundingBox(false));
-            if (Value.IsBCurve)
-               bBox.Union(Value.CurveB.GetBoundingBox(false));
-            else
-               bBox.Union(Value.PointB.GetBoundingBox(false));
-            return bBox;
+               bBox = Value.PointA.GetBoundingBox(false);
+            return DrawUtil.GetClippingBoxSupport(bBox);
          }
       }
 
@@ -43,16 +37,10 @@ namespace gh_sofistik.src
       {
          get
          {
-            BoundingBox bBox = new BoundingBox();
             if (Value.IsACurve)
-               bBox.Union(Value.CurveA.GetBoundingBox(true));
+               return Value.CurveA.GetBoundingBox(true);
             else
-               bBox.Union(Value.PointA.GetBoundingBox(true));
-            if (Value.IsBCurve)
-               bBox.Union(Value.CurveB.GetBoundingBox(true));
-            else
-               bBox.Union(Value.PointB.GetBoundingBox(true));
-            return bBox;
+               return Value.PointA.GetBoundingBox(true);
          }
       }
 
@@ -68,7 +56,7 @@ namespace gh_sofistik.src
       {
          get
          {
-            return "Spring between Points and Lines";
+            return "Spring fixation for Points and Lines";
          }
       }
 
@@ -81,36 +69,28 @@ namespace gh_sofistik.src
       {
          //ClippingBox
          //args.Pipeline.DrawBox(ClippingBox, System.Drawing.Color.Black);
-         if (!_springCond.isValid)
+         
+         if (!_cplCond.isValid)
          {
-            updateSprings();
+            updateSpring();
          }
 
          System.Drawing.Color col = args.Color;
          if (!DrawUtil.CheckSelection(col))
-            col = System.Drawing.Color.DarkViolet;
+            col = DrawUtil.DrawColorSupports;
          else
-            _springCond.DrawInfo(args.Pipeline, (GroupId == 0 ? "" : "Grp Id: " + GroupId + "\n") + "Ax. Stf: " + Axial_stiffness + "\n" + "Rot. Stf: " + Rotational_stiffness + (Direction.IsTiny() ? "" : "\nDir: " + Direction));
+            _cplCond.DrawInfo(args);
 
-         /*
-         if (Value.IsACurve)
-            args.Pipeline.DrawCurve(Value.CurveA, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointA.Location, Rhino.Display.PointStyle.X, 5, col);
-         if (Value.IsBCurve)
-            args.Pipeline.DrawCurve(Value.CurveB, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointB.Location, Rhino.Display.PointStyle.X, 5, col);         
-         */
-
-         _springCond.Draw(args.Pipeline, col);
+         _cplCond.Draw(args.Pipeline, col);
       }
 
-      private void updateSprings()
-      {
-         _springCond = new CouplingCondition();
-         _springCond.CreateCouplingSymbols(Value.GetConnectionLines());
-         //_springCond.createSpringSymbols(Value.GetConnectionLines(), axial_stiffness, rotational_stiffness);
+      private void updateSpring()
+      {         
+         _cplCond = new CouplingCondition();
+         List<string> sl = new List<string>();
+         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness);
+
+         _cplCond.CreateSpringSymbols(Value.GetSingleInputPoints(), sl, Direction);
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -119,17 +99,11 @@ namespace gh_sofistik.src
          nc.Value = new GH_CouplingStruc();
          if (!(Value.Reference_A is null))
             nc.Value.Reference_A = Value.Reference_A;
-         if (!(Value.Reference_B is null))
-            nc.Value.Reference_B = Value.Reference_B;
 
          if (Value.IsACurve)
             nc.Value.SetA(Value.CurveA.DuplicateCurve());
          else
-            nc.Value.SetA(new Point(Value.PointA.Location));
-         if (Value.IsBCurve)
-            nc.Value.SetB(Value.CurveB.DuplicateCurve());
-         else
-            nc.Value.SetB(new Point(Value.PointB.Location));
+            nc.Value.SetA(new Point(Value.PointA.Location));         
 
          nc.GroupId = GroupId;
          nc.Axial_stiffness = Axial_stiffness;
@@ -140,7 +114,7 @@ namespace gh_sofistik.src
 
       public override BoundingBox GetBoundingBox(Transform xform)
       {
-         return xform.TransformBoundingBox(ClippingBox);
+         return xform.TransformBoundingBox(Boundingbox);
       }
 
       public override IGH_GeometricGoo Transform(Transform xform)
@@ -149,11 +123,7 @@ namespace gh_sofistik.src
          if (nc.Value.IsACurve)
             nc.Value.CurveA.Transform(xform);
          else
-            nc.Value.PointA.Transform(xform);
-         if (nc.Value.IsBCurve)
-            nc.Value.CurveB.Transform(xform);
-         else
-            nc.Value.PointB.Transform(xform);
+            nc.Value.PointA.Transform(xform);         
          return nc;
       }
 
@@ -163,11 +133,7 @@ namespace gh_sofistik.src
          if (nc.Value.IsACurve)
             xmorph.Morph(nc.Value.CurveA);
          else
-            xmorph.Morph(nc.Value.PointA);
-         if (nc.Value.IsBCurve)
-            xmorph.Morph(nc.Value.CurveB);
-         else
-            xmorph.Morph(nc.Value.PointB);
+            xmorph.Morph(nc.Value.PointA);         
          return nc;
       }
 
@@ -180,70 +146,63 @@ namespace gh_sofistik.src
    public class CreateSpring : GH_Component
    {
       public CreateSpring()
-            : base("Spring", "Spring", "Creates SOFiSTiK Point/Point, Point/Line or Line/Line Spring", "SOFiSTiK", "Structure")
+            : base("Spring", "Spring", "Creates SOFiSTiK Point / Line Spring", "SOFiSTiK", "Structure")
       { }
 
       public override Guid ComponentGuid
       {
          get
          {
-            return new Guid("C6F702F1-E3E2-47AC-880D-7210465E7530");
+            return new Guid("BCCBA1EE-801E-432F-BC2C-DFDD65671A13");
          }
+      }
+      
+      protected override System.Drawing.Bitmap Icon
+      {
+         get { return Properties.Resources.structural_spring_24x24; }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("A: Point/Curve", "A", "Root geometry (Point / Curve) of this spring", GH_ParamAccess.list);
-         pManager.AddGeometryParameter("B: Reference Point/Curve", "B", "Reference geometry (Point / Curve) of this spring", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Point / Curve", "Pt/Crv", "Structural Element (Point/Line) or Geometry Point / Curve", GH_ParamAccess.list);
          pManager.AddIntegerParameter("Group", "Group", "Group number of this spring", GH_ParamAccess.list, 0);
          pManager.AddNumberParameter("Axial Stiffness", "Ax. Stf.", "Stiffness of this spring in axial direction [kN/m^3]", GH_ParamAccess.list, 0.0);
          pManager.AddNumberParameter("Rotational Stiffness", "Rot. Stf", "Stiffness of this spring in rotational direction [kNm/rad]", GH_ParamAccess.list, 0.0);
-         pManager.AddVectorParameter("Explicit Spring Direction", "Dir", "Explicit Direction of this Spring. If no direction is given, the spring is aligned towards its reference point (default)", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Direction", "Dir", "Explicit Direction of this spring", GH_ParamAccess.list, new Vector3d(0,0,1));
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Spring", "spr", "SOFiSTiK Point/Point Point/Line Line/Line Spring", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Spring", "Spr", "SOFiSTiK Spring", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
 
          List<IGH_GeometricGoo> a_list = da.GetDataList<IGH_GeometricGoo>(0);
-         List<IGH_GeometricGoo> b_list = da.GetDataList<IGH_GeometricGoo>(1);
-         List<int> groups = da.GetDataList<int>(2);
-         List<double> axial_stiffness = da.GetDataList<double>(3);
-         List<double> rotational_stiffness = da.GetDataList<double>(4);
-         List<Vector3d> alignment = da.GetDataList<Vector3d>(5);
+         List<int> groups = da.GetDataList<int>(1);
+         List<double> axial_stiffness = da.GetDataList<double>(2);
+         List<double> rotational_stiffness = da.GetDataList<double>(3);
+         List<Vector3d> direction = da.GetDataList<Vector3d>(4);
 
          List<GH_Spring> out_list = new List<GH_Spring>();
-
-         int count = Math.Min(a_list.Count, b_list.Count);
-
-         for (int i = 0; i < count; i++)
+         
+         for (int i = 0; i < a_list.Count; i++)
          {
             IGH_GeometricGoo a_goo = a_list[i];
-            IGH_GeometricGoo b_goo = b_list[i];
-            
+
             GH_Spring spr = new GH_Spring();
             spr.Value = new GH_CouplingStruc();
             spr.GroupId = groups.GetItemOrLast(i);
             spr.Axial_stiffness = axial_stiffness.GetItemOrLast(i);
             spr.Rotational_stiffness = rotational_stiffness.GetItemOrLast(i);
-            spr.Direction = alignment.GetItemOrLast(i);
+            spr.Direction = direction.GetItemOrLast(i);
             
-            Enum state = spr.Value.SetInputs(a_goo, b_goo);
+            Enum state = spr.Value.SetInput(a_goo, true);
             if (state.Equals(GH_CouplingStruc.State.OK))
                out_list.Add(spr);
-            else if (state.Equals(GH_CouplingStruc.State.InvalidA))
-               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input param A: only (structural)points/lines allowed");
-            else if (state.Equals(GH_CouplingStruc.State.InvalidB))
-               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input param B: only (structural)points/lines allowed");
-            else if (state.Equals(GH_CouplingStruc.State.Modified))
-            {
-               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Input parameters swapped, only Springs from Lines to Points are supported");
-               out_list.Add(spr);
-            }
+            else
+               this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input param: only (structural)points/lines allowed");
          }
 
          da.SetDataList(0, out_list);
