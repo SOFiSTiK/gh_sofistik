@@ -25,15 +25,15 @@ namespace gh_sofistik
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddColourParameter("Color Structural Elements", "Color Structural Elements", "Adjust Color for Structural Points/Lines/Areas", GH_ParamAccess.item, System.Drawing.Color.Red);
-         pManager.AddColourParameter("Color Loads", "Color Loads", "Adjust Color for Point/Line/Area Load Forces and Moments", GH_ParamAccess.item, System.Drawing.Color.Red);
-         pManager.AddColourParameter("Color Supports", "Color Supports", "Adjust Color for Point and Line Supports", GH_ParamAccess.item, System.Drawing.Color.Red);
-         pManager.AddNumberParameter("Scale Factor Loads", "Scale Factor Loads", "Global Scale Factor for displayed SOFiSTiK Loads", GH_ParamAccess.item, 1.0);
-         pManager.AddNumberParameter("Density Factor Loads", "Density Factor Loads", "Global Density for Line/Area Loads", GH_ParamAccess.item, 1.0);
-         pManager.AddNumberParameter("Scale Factor Supports", "Scale Factor Supports", "Global Scale Factor for displayed SOFiSTiK Support Symbols", GH_ParamAccess.item, 1.0);
-         pManager.AddNumberParameter("Density Factor Supports", "Density Factor Supports", "Global Density for Line Supports", GH_ParamAccess.item, 1.0);
-         pManager.AddNumberParameter("Scale Factor LocalFrame", "Scale Factor for local Frame", "Global Scale Factor for displayed local coordinate frames", GH_ParamAccess.item, 0.0);
-         pManager.AddNumberParameter("Density Factor LocalFrame", "Density Factor for local Frame", "Global Density Factor for displayed local coordinate frames", GH_ParamAccess.item, 1.0);
+         pManager.AddColourParameter("Color Structural Elements", "Color Structural Elements", "Adjust Color for Structural Points/Lines/Areas", GH_ParamAccess.item, DrawUtil.DrawColorStructuralElements);
+         pManager.AddColourParameter("Color Loads", "Color Loads", "Adjust Color for Point/Line/Area Load Forces and Moments", GH_ParamAccess.item, DrawUtil.DrawColorLoads);
+         pManager.AddColourParameter("Color Supports", "Color Supports", "Adjust Color for Point and Line Supports", GH_ParamAccess.item, DrawUtil.DrawColorSupports);
+         pManager.AddNumberParameter("Scale Factor Loads", "Scale Factor Loads", "Global Scale Factor for displayed SOFiSTiK Loads", GH_ParamAccess.item, DrawUtil.ScaleFactorLoads);
+         pManager.AddNumberParameter("Density Factor Loads", "Density Factor Loads", "Global Density for Line/Area Loads", GH_ParamAccess.item, DrawUtil.DensityFactorLoads);
+         pManager.AddNumberParameter("Scale Factor Supports", "Scale Factor Supports", "Global Scale Factor for displayed SOFiSTiK Support Symbols", GH_ParamAccess.item, DrawUtil.ScaleFactorSupports);
+         pManager.AddNumberParameter("Density Factor Supports", "Density Factor Supports", "Global Density for Line Supports", GH_ParamAccess.item, DrawUtil.DensityFactorSupports);
+         pManager.AddNumberParameter("Scale Factor LocalFrame", "Scale Factor for local Frame", "Global Scale Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.ScaleFactorLocalFrame);
+         pManager.AddNumberParameter("Density Factor LocalFrame", "Density Factor for local Frame", "Global Density Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.DensityFactorLocalFrame);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)

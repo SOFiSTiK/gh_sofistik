@@ -30,12 +30,13 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
+         pManager.AddBooleanParameter("Init System", "Init System", "Initializes a new SOFiSTiK calculation system. At least one SOFiMSHC component needs this to be true. If true, all existing system data gets deleted", GH_ParamAccess.item, true);
          pManager.AddBooleanParameter("Create mesh", "Create Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
          pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 1.0);
          pManager.AddNumberParameter("Intersection tolerance", "Tolerance", "Geometric intersection tolerance in [m]", GH_ParamAccess.item, 0.01);
          pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned element numbers", GH_ParamAccess.item, 50000);
          pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
-         pManager.AddTextParameter("Text input", "Add. Text", "Additional text input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -46,27 +47,31 @@ namespace gh_sofistik
       public override void DrawViewportWires(IGH_PreviewArgs args)
       {
          base.DrawViewportWires(args);
-         
+
          if (this.Attributes.Selected)
-            args.Display.DrawBox(_boundingBox, args.WireColour_Selected);         
+         {
+            args.Display.DrawBox(_boundingBox, args.WireColour_Selected);            
+         }
       }   
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
-         bool mesh = da.GetData<bool>(1);
-         double hmin = da.GetData<double>(2);
-         double tolg = da.GetData<double>(3);
-         int idBorder = da.GetData<int>(4);
-         string ctrl = da.GetData<string>(5);
-         string text = da.GetData<string>(6);
+         bool initSystem = da.GetData<bool>(1);
+         bool mesh = da.GetData<bool>(2);
+         double hmin = da.GetData<double>(3);
+         double tolg = da.GetData<double>(4);
+         int idBorder = da.GetData<int>(5);
+         string ctrl = da.GetData<string>(6);
+         string text = da.GetData<string>(7);
 
+         var structural_elements_pre = new List<IGS_StructuralElement>();
          var structural_elements = new List<IGS_StructuralElement>();
          List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information = new List<GH_GeometricGoo<GH_CouplingStruc>>();
 
          foreach (var it in da.GetDataList<IGH_Goo>(0))
          {
             if (it is IGS_StructuralElement)
-               structural_elements.Add(it as IGS_StructuralElement);
+               structural_elements_pre.Add(it as IGS_StructuralElement);
 
             else if (it is GH_GeometricGoo<GH_CouplingStruc>)
                coupling_information.Add(it as GH_GeometricGoo<GH_CouplingStruc>);
@@ -77,10 +82,11 @@ namespace gh_sofistik
 
          int id = idBorder;
          SortedSet<int> idSet = new SortedSet<int>();
-         // assign auto generated IDs temporarily and write "Id=0" back at end of this method
+         // assign auto generated IDs temporarily (just for couplings) and write "Id=0" back at end of this method
          List<IGS_StructuralElement> write_id_back_to_zero = new List<IGS_StructuralElement>();
-         id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
+         //id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
          addUnknownElementsFromCouplings(id, idSet, structural_elements, coupling_information, write_id_back_to_zero);
+         addStructuralElements(idSet, structural_elements, structural_elements_pre);
          
          // build hashmap for couplings: for one id (key), you get a list of couplings in which this structural element is involved
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMap = buildCouplingMap(coupling_information);
@@ -101,7 +107,12 @@ namespace gh_sofistik
          sb.AppendLine("+PROG SOFIMSHC");
          sb.AppendLine("HEAD");
          sb.AppendLine("PAGE UNII 0"); // export always in SOFiSTiK database units
-         sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
+
+         if(initSystem)
+            sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
+         else
+            sb.AppendLine("SYST REST");
+
          sb.AppendFormat("CTRL TOLG {0:F6}\n", tolg);
          if (mesh)
          {
@@ -283,6 +294,17 @@ namespace gh_sofistik
             idSet.Add(se.Id);
          }
          return id;
+      }
+
+      private void addStructuralElements(SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<IGS_StructuralElement> structural_elements_pre)
+      {
+         foreach(IGS_StructuralElement se in structural_elements_pre)
+         {
+            if(se.Id == 0 || !idSet.Contains(se.Id))
+            {
+               structural_elements.Add(se);
+            }
+         }
       }
 
       private int addUnknownElementsFromCouplings(int id, SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information, List<IGS_StructuralElement> write_id_back_to_zero)

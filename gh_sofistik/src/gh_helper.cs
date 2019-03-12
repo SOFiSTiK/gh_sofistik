@@ -136,52 +136,64 @@ namespace gh_sofistik
    static class DrawUtil
    {
       private static double scaleFactorLoads = 1.0;
-
       public static double ScaleFactorLoads
       {
-         get
-         {
-            return scaleFactorLoads;
-         }
+         get { return scaleFactorLoads; }
          set
          {
             scaleFactorLoads = value < 0 ? 0 : value;
          }
       }
 
-      public static double DensityFactorLoads { get; set; } = 1.0;
+      private static double densityFactorLoads = 1.0;
+      public static double DensityFactorLoads
+      {
+         get { return densityFactorLoads; }
+         set
+         {
+            densityFactorLoads = value < 0 ? 0 : value;
+         }
+      }
 
       private static double scaleFactorSupports = 1.0;
-
       public static double ScaleFactorSupports
       {
-         get
-         {
-            return scaleFactorSupports;
-         }
+         get { return scaleFactorSupports; }
          set
          {
             scaleFactorSupports = value < 0 ? 0 : value;
          }
       }
 
-      public static double DensityFactorSupports { get; set; } = 1.0;
+      private static double densityFactorSupports = 1.0;
+      public static double DensityFactorSupports
+      {
+         get { return densityFactorSupports; }
+         set
+         {
+            densityFactorSupports = value < 0 ? 0 : value;
+         }
+      }
 
-      private static double scaleFactorLocalFrame = 0.0;
-
+      private static double scaleFactorLocalFrame = 1.0;
       public static double ScaleFactorLocalFrame
       {
-         get
-         {
-            return scaleFactorLocalFrame;
-         }
+         get { return scaleFactorLocalFrame; }
          set
          {
             scaleFactorLocalFrame = value < 0 ? 0 : value;
          }
       }
 
-      public static double DensityFactorLocalFrame { get; set; } = 1.0;
+      private static double densityFactorLocalFrame = 0.0;
+      public static double DensityFactorLocalFrame
+      {
+         get { return densityFactorLocalFrame; }
+         set
+         {
+            densityFactorLocalFrame = value < 0 ? 0 : value;
+         }
+      }
 
       public static System.Drawing.Color DrawColorStructuralElements { get; set; } = System.Drawing.Color.Red;
 
@@ -293,15 +305,18 @@ namespace gh_sofistik
       public static bool[,,] ParseFixString(string s)
       {
          bool[,,] bits = { { { false, false }, { false, false }, { false, false } }, { { false, false }, { false, false }, { false, false } } };
-         String lowS = s.Trim().ToLower();
-         lowS = lowS.Replace("f", "pxpypzmxmymz").Replace("pp", "pxpypz").Replace("mm", "mxmymz");
-         lowS = ".." + lowS;
-         char[] ca = lowS.ToCharArray();
-         for (int i = 1; i < ca.Length; i++)
+         if (!(s is null))
          {
-            if (ca[i].Equals('x')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 0);
-            if (ca[i].Equals('y')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 1);
-            if (ca[i].Equals('z')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 2);
+            String lowS = s.Trim().ToLower();
+            lowS = lowS.Replace("f", "pxpypzmxmymz").Replace("pp", "pxpypz").Replace("mm", "mxmymz");
+            lowS = ".." + lowS;
+            char[] ca = lowS.ToCharArray();
+            for (int i = 1; i < ca.Length; i++)
+            {
+               if (ca[i].Equals('x')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 0);
+               if (ca[i].Equals('y')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 1);
+               if (ca[i].Equals('z')) checkPrevChar(bits, ca[i - 1], ca[i - 2], 2);
+            }
          }
          return bits;
       }
@@ -630,18 +645,22 @@ namespace gh_sofistik
 
             if (_freePositionLines.Count > 0)
             {
-               foreach (Line l in _freePositionLines)
-               {                  
-                  pipeline.DrawLine(l, col);
-               }
+               if(shaded)
+                  foreach (Line l in _freePositionLines)
+                     pipeline.DrawLine(l, col);
+               else
+                  foreach (Line l in _freePositionLines)
+                     pipeline.DrawLine(l, col, 3);
             }
 
             if (_momentLines.Count > 0)
             {
-               foreach (Line l in _momentLines)
-               {
-                  pipeline.DrawLine(l, col);
-               }
+               if(shaded)
+                  foreach (Line l in _momentLines)
+                     pipeline.DrawLine(l, col);
+               else
+                  foreach (Line l in _momentLines)
+                     pipeline.DrawLine(l, col, 3);
             }            
          }
 
@@ -1259,17 +1278,32 @@ namespace gh_sofistik
       {
          foreach(Transform t in Transforms)
          {
-            Line xLine = new Line(Point3d.Origin, new Point3d(1, 0, 0));
-            Line yLine = new Line(Point3d.Origin, new Point3d(0, 1, 0));
-            Line zLine = new Line(Point3d.Origin, new Point3d(0, 0, 1));
+            Line xLine = new Line(new Point3d(0.1, 0, 0), new Point3d(1, 0, 0));
+            Line yLine = new Line(new Point3d(0, 0.1, 0), new Point3d(0, 1, 0));
+            Line zLine = new Line(new Point3d(0, 0, 0.1), new Point3d(0, 0, 1));
+
+            Line xLine2 = new Line(new Point3d(0.1, 0, 0), new Point3d(0.8, 0, 0));
+            Line yLine2 = new Line(new Point3d(0, 0.1, 0), new Point3d(0, 0.8, 0));
+            Line zLine2 = new Line(new Point3d(0, 0, 0.1), new Point3d(0, 0, 0.8));
+
 
             xLine.Transform(t);
             yLine.Transform(t);
             zLine.Transform(t);
 
-            pipeline.DrawArrow(xLine, System.Drawing.Color.Red, 0.0, 0.2);
-            pipeline.DrawArrow(yLine, System.Drawing.Color.Green, 0.0, 0.2);
-            pipeline.DrawArrow(zLine, System.Drawing.Color.Blue, 0.0, 0.2);
+            xLine2.Transform(t);
+            yLine2.Transform(t);
+            zLine2.Transform(t);
+
+            
+            pipeline.DrawLine(xLine2, System.Drawing.Color.Red, 2);
+            pipeline.DrawLine(yLine2, System.Drawing.Color.Green, 2);
+            pipeline.DrawLine(zLine2, System.Drawing.Color.Blue, 2);
+            
+
+            pipeline.DrawArrow(xLine, System.Drawing.Color.Red, 0.0, 0.382);
+            pipeline.DrawArrow(yLine, System.Drawing.Color.Green, 0.0, 0.382);
+            pipeline.DrawArrow(zLine, System.Drawing.Color.Blue, 0.0, 0.382);            
          }
       }
    }

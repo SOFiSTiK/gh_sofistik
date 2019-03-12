@@ -41,7 +41,10 @@ namespace gh_sofistik
          }
          set
          {
-            fixLiteral = value;
+            if (value is null)
+               fixLiteral = "";
+            else
+               fixLiteral = value;
             _supp_condition = new SupportCondition(fixLiteral);
          }
       }

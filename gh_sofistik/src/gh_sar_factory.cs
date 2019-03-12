@@ -331,6 +331,12 @@ namespace gh_sofistik
 
       private string parseAlignmentString(string s)
       {
+         if(s is null)
+         {
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Alignment string is null. default value \"Centered\" will be used");
+            return "CENT";
+         }
+            
          string slow = s.Trim().ToLower();
 
          string res = "CENT";
@@ -348,6 +354,12 @@ namespace gh_sofistik
 
       private string parseMeshOptionsString(string s)
       {
+         if (s is null)
+         {
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Mesh Options string is null. default value \"Automatic\" will be used");
+            return "AUTO";
+         }
+
          string slow = s.Trim().ToLower();
 
          string res = "AUTO";

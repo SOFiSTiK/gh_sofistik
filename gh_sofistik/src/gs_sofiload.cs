@@ -327,9 +327,10 @@ namespace gh_sofistik
             var tmid = cv.TangentAt(cv.Domain.Mid);
 
             double alph = Vector3d.VectorAngle(tstart, tmid);
-            int n_seg = (int)(18.0 * alph / 3.1415);
-
-            for(int i=0; i<n_seg+1; ++i)
+            int max_seg = 18;
+            int n_seg = Math.Max(3, (int)((double)max_seg * alph / 3.1415));
+            
+            for(int i=0; i<=n_seg; ++i)
             {
                double si = cv.Domain.ParameterAt((double)i / (double)n_seg);
                points.Add(cv.PointAt(si));

@@ -27,7 +27,10 @@ namespace gh_sofistik
          }
          set
          {
-            fixLiteral = value;
+            if (value is null)
+               fixLiteral = "";
+            else
+               fixLiteral = value;
             _supp_condition = new SupportCondition(fixLiteral);
          }
       }      
@@ -319,6 +322,12 @@ namespace gh_sofistik
 
       private string parseElementTypeString(string s)
       {
+         if (s is null)
+         {
+            this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Element Type string is null. default value \"Beam\" will be used");
+            return "B";
+         }
+
          string slow = s.Trim().ToLower();
 
          string res = "B";
