@@ -95,6 +95,7 @@ namespace gh_sofistik
       {
          pManager.AddGeometryParameter("Ld", "Ld", "Collection of SOFiSTiK Load Items", GH_ParamAccess.list);
          pManager.AddTextParameter("Lc", "Lc", "Load Case Definition (in SOFiLOAD Syntax)", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of loads", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -126,6 +127,8 @@ namespace gh_sofistik
             }
          }
 
+         string text = da.GetData<string>(2);
+
          var sb = new StringBuilder();
 
          sb.AppendLine("+PROG SOFILOAD");
@@ -144,6 +147,7 @@ namespace gh_sofistik
             if(load_cases.TryGetValue(lc_loads.Key,out lc_definition))
             {
                sb.AppendLine(lc_definition.Trim());
+               load_cases.Remove(lc_loads.Key);
             }
             else
             {
@@ -279,6 +283,18 @@ namespace gh_sofistik
             }
          }
 
+         // write load case definitions not being considered before
+         foreach( var ilc in load_cases )
+         {
+            sb.Append(ilc.Value);
+            sb.AppendLine();
+         }
+
+         // add additional text
+         if (!string.IsNullOrEmpty(text))
+         {
+            sb.Append(text);
+         }
          sb.AppendLine();
          sb.AppendLine("END");
 

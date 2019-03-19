@@ -263,7 +263,7 @@ namespace gh_sofistik
          }
          sb.AppendLine();
 
-         // add control string
+         // add additional text
          if (!string.IsNullOrEmpty(text))
          {
             sb.Append(text);
