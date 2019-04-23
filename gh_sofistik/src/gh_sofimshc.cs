@@ -691,9 +691,30 @@ namespace gh_sofistik
                var ed = tr.Edge;
                if (ed != null)
                {
+                  // check whether curve needs to be trimmed
+                  var va = ed.StartVertex;
+                  var ve = ed.EndVertex;
+
+                  double t0 = ed.EdgeCurve.Domain.T0;
+                  double t1 = ed.EdgeCurve.Domain.T1;
+
+                  ed.EdgeCurve.ClosestPoint(va.Location, out t0);
+                  ed.EdgeCurve.ClosestPoint(ve.Location, out t1);
+
+                  Curve curve = null;
+                  if(Math.Abs(t0-ed.EdgeCurve.Domain.T0) > 1.0E-4 || Math.Abs(t1-ed.EdgeCurve.Domain.T1) > 1.0E-4)
+                  {
+                     curve = ed.EdgeCurve.Trim(t0, t1);
+                  }
+                  else
+                  {
+                     curve = ed.EdgeCurve;
+                  }
+
+                  // write to output
                   sb.AppendFormat("SARB {0}", type);
                   sb.AppendLine();
-                  AppendCurveGeometry(sb, ed.EdgeCurve);
+                  AppendCurveGeometry(sb, curve);
                }
             }
          }
