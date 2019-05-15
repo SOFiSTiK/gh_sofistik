@@ -131,6 +131,29 @@ namespace gh_sofistik
          target = default(Q);
          return false;
       }
+
+      public static Tuple<int,int> ParseSectionIdentifier(string section_identifier)
+      {
+         int id_start = 0;
+         int id_end = 0;
+
+         if (string.IsNullOrEmpty(section_identifier) == false)
+         {
+            var sub_strings = section_identifier.Split(new char[2] { '.',':' });
+
+            if (sub_strings.Length > 0)
+            {
+               int.TryParse(sub_strings[0], out id_start);
+            }
+            if (sub_strings.Length > 1)
+            {
+               int.TryParse(sub_strings[1], out id_end);
+            }
+
+            if (id_end == 0) id_end = id_start;
+         }
+         return new Tuple<int, int>(id_start, id_end);
+      }
    }
 
    static class DrawUtil

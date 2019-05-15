@@ -16,7 +16,8 @@ namespace gh_sofistik
    {
       public int Id { get; set; } = 0;
       public int GroupId { get; set; } = 0;    
-      public int SectionId { get; set; } = 0;
+      public int SectionIdStart { get; set; } = 0;
+      public int SectionIdEnd { get; set; } = 0;
       public Vector3d DirectionLocalZ { get; set; } = new Vector3d();      
       private string fixLiteral = string.Empty;
       public string FixLiteral
@@ -69,7 +70,8 @@ namespace gh_sofistik
             Value = this.Value.DuplicateCurve(),
             Id = this.Id,
             GroupId = this.GroupId,
-            SectionId = this.SectionId,
+            SectionIdStart = this.SectionIdStart,
+            SectionIdEnd = this.SectionIdEnd,
             DirectionLocalZ = this.DirectionLocalZ,
             FixLiteral = this.FixLiteral,
             ElementType = this.ElementType,
@@ -222,12 +224,16 @@ namespace gh_sofistik
 
             if(this.GroupId > 0)
                att.SetUserString("SOF_GRP", this.GroupId.ToString());
-            if(this.SectionId > 0)
+            if(this.SectionIdStart > 0)
             {
                att.SetUserString("SOF_STYP", "B");
                att.SetUserString("SOF_STYP2", "E");
-               att.SetUserString("SOF_SNO", this.SectionId.ToString());
-               att.SetUserString("SOF_SNOE", "SOF_PROP_COMBO_NONE");
+               att.SetUserString("SOF_SNO", SectionIdStart.ToString());
+
+               if(this.SectionIdEnd > 0)
+                  att.SetUserString("SOF_SNOE", SectionIdEnd.ToString());
+               else
+                  att.SetUserString("SOF_SNOE", "SOF_PROP_COMBO_NONE");
             }
             att.SetUserString("SOF_SDIV", "0.0");
 
@@ -268,7 +274,7 @@ namespace gh_sofistik
          pManager.AddCurveParameter("Curve", "Crv", "Curve Geometry", GH_ParamAccess.list);
          pManager.AddIntegerParameter("Number", "Number", "Identifier of structural line", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("Group", "Group", "Group number of structural line", GH_ParamAccess.list, 0);
-         pManager.AddIntegerParameter("Section", "Section", "Identifier of cross section", GH_ParamAccess.list, 0);
+         pManager.AddTextParameter("Section", "Section", "Identifier of cross section or start and end section separated by '.' (e.g. '1.2')", GH_ParamAccess.list, string.Empty);
          pManager.AddVectorParameter("Dir Z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
          pManager.AddTextParameter("Element Type", "Element Type", "Element Type of this structural line (Beam = default, Truss, Cable)", GH_ParamAccess.list, "Beam");
@@ -286,7 +292,7 @@ namespace gh_sofistik
          var curves = da.GetDataList<Curve>(0);
          var identifiers = da.GetDataList<int>(1);
          var groups = da.GetDataList<int>(2);
-         var sections = da.GetDataList<int>(3);
+         var sections = da.GetDataList<string>(3);
          var zdirs = da.GetDataList<Vector3d>(4);
          var fixations = da.GetDataList<string>(5);
          var elementType = da.GetDataList<string>(6);
@@ -301,12 +307,15 @@ namespace gh_sofistik
 
             if (!(c is null))
             {
+               var section_ids = Util.ParseSectionIdentifier(sections.GetItemOrLast(i));
+
                var gc = new GS_StructuralLine()
                {
                   Value = c,
                   Id = identifiers.GetItemOrCountUp(i),
                   GroupId = groups.GetItemOrLast(i),
-                  SectionId = sections.GetItemOrLast(i),
+                  SectionIdStart = section_ids.Item1,
+                  SectionIdEnd = section_ids.Item2,
                   DirectionLocalZ = zdirs.GetItemOrLast(i),
                   FixLiteral = fixations.GetItemOrLast(i),
                   ElementType = parseElementTypeString(elementType.GetItemOrLast(i)),

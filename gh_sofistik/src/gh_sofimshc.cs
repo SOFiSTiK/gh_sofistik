@@ -164,7 +164,15 @@ namespace gh_sofistik
 
                string id_string = se.Id > 0 ? se.Id.ToString() : "-";
                string id_group = sln.GroupId > 0 ? sln.GroupId.ToString() : "-";
-               string id_section = sln.SectionId > 0 ? sln.SectionId.ToString() : "-";
+
+               string id_section = "-";
+               if(sln.SectionIdStart>0)
+               {
+                  if (sln.SectionIdEnd == 0 || sln.SectionIdEnd == sln.SectionIdStart)
+                     id_section = sln.SectionIdStart.ToString();
+                  else
+                     id_section = string.Format("\"{0}.{1}\"", sln.SectionIdStart, sln.SectionIdEnd);
+               }
 
                sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, id_group, id_section);
 
