@@ -81,15 +81,17 @@ namespace gh_sofistik
          }
 
          int id = idBorder;
-         SortedSet<int> idSet = new SortedSet<int>();
+         SortedSet<int> idSetPoint = new SortedSet<int>();
+         SortedSet<int> idSetLine = new SortedSet<int>();
          // assign auto generated IDs temporarily (just for couplings) and write "Id=0" back at end of this method
          List<IGS_StructuralElement> write_id_back_to_zero = new List<IGS_StructuralElement>();
          //id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
-         addUnknownElementsFromCouplings(id, idSet, structural_elements, coupling_information, write_id_back_to_zero);
-         addStructuralElements(idSet, structural_elements, structural_elements_pre);
+         addUnknownElementsFromCouplings(id, idSetPoint, idSetLine, structural_elements, coupling_information, write_id_back_to_zero);
+         addStructuralElements(idSetPoint, idSetLine, structural_elements, structural_elements_pre);
          
          // build hashmap for couplings: for one id (key), you get a list of couplings in which this structural element is involved
-         Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMap = buildCouplingMap(coupling_information);
+         Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapPoint = buildCouplingMap(coupling_information, false);
+         Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapLine = buildCouplingMap(coupling_information, true);
 
          _boundingBox = new BoundingBox();
          if (structural_elements.Count > 0) {
@@ -153,7 +155,7 @@ namespace gh_sofistik
 
                sb.AppendLine();
 
-               AppendCouplingInformation(sb, se, couplingMap);
+               AppendCouplingInformation(sb, se, couplingMapPoint);
             }
             // write structural lines
             else if (se is GS_StructuralLine)
@@ -196,7 +198,7 @@ namespace gh_sofistik
 
                AppendCurveGeometry(sb, sln.Value);
 
-               AppendCouplingInformation(sb, se, couplingMap);
+               AppendCouplingInformation(sb, se, couplingMapLine);
             }
             // write structural areas
             else if (se is GS_StructuralArea)
@@ -304,22 +306,36 @@ namespace gh_sofistik
          return id;
       }
 
-      private void addStructuralElements(SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<IGS_StructuralElement> structural_elements_pre)
+      private void addStructuralElements(SortedSet<int> idSetPoint, SortedSet<int> idSetLine, List<IGS_StructuralElement> structural_elements, List<IGS_StructuralElement> structural_elements_pre)
       {
          foreach(IGS_StructuralElement se in structural_elements_pre)
          {
-            if(se.Id == 0 || !idSet.Contains(se.Id))
+            if(se is GS_StructuralPoint)
+            {
+               if (se.Id == 0 || !idSetPoint.Contains(se.Id))
+                  structural_elements.Add(se);               
+            }
+            else if (se is GS_StructuralLine)
+            {
+               if (se.Id == 0 || !idSetLine.Contains(se.Id))
+                  structural_elements.Add(se);
+            }
+            else
             {
                structural_elements.Add(se);
             }
          }
       }
 
-      private int addUnknownElementsFromCouplings(int id, SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information, List<IGS_StructuralElement> write_id_back_to_zero)
+      private int addUnknownElementsFromCouplings(int id, SortedSet<int> idSetPoint, SortedSet<int> idSetLine, List<IGS_StructuralElement> structural_elements, List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information, List<IGS_StructuralElement> write_id_back_to_zero)
       {
          // add StructuralElements to sofimshc which dont go directly into sofimshc but into something like Coupling and assign IDs if necessary
          foreach (GH_GeometricGoo<GH_CouplingStruc> gg in coupling_information)
          {
+            SortedSet<int> idSet = idSetPoint;
+            if (gg.Value.Reference_A is GS_StructuralLine)
+               idSet = idSetLine;
+
             if (gg.Value.Reference_A.Id != 0)
             {
                if (!idSet.Contains(gg.Value.Reference_A.Id))
@@ -335,9 +351,12 @@ namespace gh_sofistik
                structural_elements.Add(gg.Value.Reference_A);
                idSet.Add(gg.Value.Reference_A.Id);
             }
-
+            
             if (!(gg.Value.Reference_B is null))
             {
+               idSet = idSetPoint;
+               if (gg.Value.Reference_B is GS_StructuralLine)
+                  idSet = idSetLine;
                if (gg.Value.Reference_B.Id != 0)
                {
                   if (!idSet.Contains(gg.Value.Reference_B.Id))
@@ -358,13 +377,13 @@ namespace gh_sofistik
          return id;
       }
 
-      private Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> buildCouplingMap(List<GH_GeometricGoo<GH_CouplingStruc>> cpl_list)
+      private Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> buildCouplingMap(List<GH_GeometricGoo<GH_CouplingStruc>> cpl_list, bool isLine)
       {
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> map = new Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>>();
          foreach (GH_GeometricGoo<GH_CouplingStruc> gg in cpl_list)
          {
-            if (!(gg.Value.Reference_A is null))
-            {
+            if (!(gg.Value.Reference_A is null) && ((!isLine && gg.Value.Reference_A is GS_StructuralPoint) || isLine && gg.Value.Reference_A is GS_StructuralLine))
+            { 
                List<GH_GeometricGoo<GH_CouplingStruc>> csList_temp;
                if (!map.TryGetValue(gg.Value.Reference_A.Id, out csList_temp))
                {
