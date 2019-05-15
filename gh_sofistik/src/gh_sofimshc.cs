@@ -32,9 +32,9 @@ namespace gh_sofistik
          pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
          pManager.AddBooleanParameter("Init System", "Init System", "Initializes a new SOFiSTiK calculation system. At least one SOFiMSHC component needs this to be true. If true, all existing system data gets deleted", GH_ParamAccess.item, true);
          pManager.AddBooleanParameter("Create mesh", "Create Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
-         pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 1.0);
+         pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 0.0);
          pManager.AddNumberParameter("Intersection tolerance", "Tolerance", "Geometric intersection tolerance in [m]", GH_ParamAccess.item, 0.01);
-         pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned element numbers", GH_ParamAccess.item, 50000);
+         pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned element numbers", GH_ParamAccess.item, 10000);
          pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
          pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
       }
@@ -117,7 +117,7 @@ namespace gh_sofistik
          if (mesh)
          {
             sb.AppendLine("CTRL MESH 1");
-            sb.AppendFormat("CTRL HMIN {0:F3}\n", hmin);
+            sb.AppendFormat("CTRL HMIN {0}\n", hmin != 0.0 ? string.Format("{0:F4}", hmin) : "-");
          }
 
          // add control string
@@ -691,6 +691,8 @@ namespace gh_sofistik
                var ed = tr.Edge;
                if (ed != null)
                {
+                  Curve curve = ed.EdgeCurve;
+
                   // check whether curve needs to be trimmed
                   var va = ed.StartVertex;
                   var ve = ed.EndVertex;
@@ -701,14 +703,10 @@ namespace gh_sofistik
                   ed.EdgeCurve.ClosestPoint(va.Location, out t0);
                   ed.EdgeCurve.ClosestPoint(ve.Location, out t1);
 
-                  Curve curve = null;
-                  if(Math.Abs(t0-ed.EdgeCurve.Domain.T0) > 1.0E-4 || Math.Abs(t1-ed.EdgeCurve.Domain.T1) > 1.0E-4)
+                  if(Math.Abs(t1-t0) > 1.0E-3 &&
+                     (Math.Abs(t0-ed.EdgeCurve.Domain.T0) > 1.0E-4 || Math.Abs(t1-ed.EdgeCurve.Domain.T1) > 1.0E-4))
                   {
                      curve = ed.EdgeCurve.Trim(t0, t1);
-                  }
-                  else
-                  {
-                     curve = ed.EdgeCurve;
                   }
 
                   // write to output
