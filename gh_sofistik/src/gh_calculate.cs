@@ -15,9 +15,12 @@ namespace gh_sofistik
 {
    public class TextStream : GH_Component
    {
+      private string _sofistik_exe_path = string.Empty;
+      private string _sofistik_project_name = string.Empty;
       private string _path_by_dialog = string.Empty;
       private string _path_active = string.Empty;
       private bool _stream_content = true;
+      private bool _run_immediately = false;
 
       public TextStream()
          : base("Text File", "TextFile", "Streams the given input to a text file (e.g. SOFiSTiK *.dat input)", "SOFiSTiK", "General")
@@ -46,7 +49,9 @@ namespace gh_sofistik
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddTextParameter("Text Input", "Txt", "Text input, e.g for SOFiSTiK calculation", GH_ParamAccess.list);
-         pManager.AddTextParameter("File Path", "Path", "Path to Text File", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("File Path", "File Path", "Path to Text File", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("SOFiSTiK Binary Path", "SOFiSTiK Path", "Path to SOFiSTiK Binaries", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("SOFiSTiK Project Name", "Project Name", "Sets SOFiSTiK 'project' Variable", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -92,6 +97,24 @@ namespace gh_sofistik
             return;
          }
 
+         // Optional path to SOFiSTiK binaries..
+         var exe_path = da.GetData<string>(2);
+         // check directory
+         if (!string.IsNullOrEmpty(exe_path) & !System.IO.Directory.Exists(exe_path))
+         {
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Given directory for SOFiSTiK binaries does not exist!");
+            return;
+         }
+         _sofistik_exe_path = exe_path;
+
+         // Optional PROJECT variable..
+         var project = da.GetData<string>(3);
+         if (string.IsNullOrEmpty(project))
+         {
+            project = System.IO.Path.GetFileNameWithoutExtension(file_name);
+         }
+         _sofistik_project_name = project;
+         
          // write to file
          var file_exists = System.IO.File.Exists(file_name);
          if(_stream_content || file_exists == false)
@@ -100,6 +123,11 @@ namespace gh_sofistik
          }
 
          _path_active = file_name;
+
+         if (_run_immediately)
+         {
+            RunCalculation();
+         }
       }
 
 
@@ -110,11 +138,13 @@ namespace gh_sofistik
          Menu_AppendSeparator(menu);
          // Menu_AppendItem(menu, "Select Project File", Menu_OnSelectProjectFile,Properties.Resources.folder_open_icon_16x16);
          Menu_AppendItem(menu, "Stream Input", Menu_OnStreamContentClicked, true, _stream_content);
+         Menu_AppendSeparator(menu);
+         Menu_AppendItem(menu, "Run Immediately", Menu_OnRunImmediatelyClicked, true, _run_immediately);
 
          if (System.IO.Path.GetExtension(_path_active).ToLower() == ".dat")
          {
             Menu_AppendSeparator(menu);
-            //Menu_AppendItem(menu, "Calculate Project", Menu_OnCalculateWPS);
+            Menu_AppendItem(menu, "Calculate Project", Menu_OnCalculateWPS);
             Menu_AppendItem(menu, "System Visualisation", Menu_OnOpenAnimator);
             Menu_AppendItem(menu, "Open Teddy", Menu_OnOpenTeddy);
          }
@@ -130,6 +160,19 @@ namespace gh_sofistik
          else // fallback
          {
             _stream_content = !_stream_content;
+         }
+      }
+
+      private void Menu_OnRunImmediatelyClicked(Object sender, EventArgs e)
+      {
+         if (sender is System.Windows.Forms.ToolStripMenuItem)
+         {
+            var mi = sender as System.Windows.Forms.ToolStripMenuItem;
+            _run_immediately = !mi.Checked;
+         }
+         else // fallback
+         {
+            _run_immediately = !_stream_content;
          }
       }
 
@@ -161,7 +204,48 @@ namespace gh_sofistik
 
       private void Menu_OnCalculateWPS(Object sender, EventArgs e)
       {
-         throw new NotImplementedException();
+         if (string.IsNullOrEmpty(_sofistik_exe_path))
+         {
+            MessageBox.Show("SOFiSTiK Binary path must be provided for calculation!", "SOFiSTiK");
+            return;
+         }
+
+         var dat_path = System.IO.Path.ChangeExtension(_path_active, ".dat");
+         if (System.IO.File.Exists(dat_path))
+         {
+            var process = new System.Diagnostics.Process();
+            var executable = _sofistik_exe_path + "wps.exe";
+            var arguments = "\"" + dat_path + "\"";
+            process.StartInfo.FileName = executable;
+            process.StartInfo.Arguments = arguments;
+            if (!process.Start())
+               MessageBox.Show("Unable to open SOFiSTiK WPS.\n" + executable, "SOFiSTiK");
+         }
+         else
+            MessageBox.Show("SOFiSTiK dat file to be calculated does not exist:\n" + dat_path, "SOFiSTiK");
+      }
+
+      private void RunCalculation()
+      {
+         if (string.IsNullOrEmpty(_sofistik_exe_path))
+         {
+            MessageBox.Show("SOFiSTiK Binary path must be provided for calculation!", "SOFiSTiK");
+            return;
+         }
+
+         var dat_path = System.IO.Path.ChangeExtension(_path_active, ".dat");
+         if (System.IO.File.Exists(dat_path))
+         {
+            var process = new System.Diagnostics.Process();
+            var executable = _sofistik_exe_path + "wps.exe";
+            var arguments = "-b -run -noclose " + "\"" + dat_path + "\"";
+            process.StartInfo.FileName = executable;
+            process.StartInfo.Arguments = arguments;
+            if (!process.Start())
+               MessageBox.Show("Unable to open SOFiSTiK WPS.\n" + executable, "SOFiSTiK");
+         }
+         else
+            MessageBox.Show("SOFiSTiK dat file to be calculated does not exist:\n" + dat_path, "SOFiSTiK");
       }
 
       private void Menu_OnOpenAnimator(Object sender, EventArgs e)
@@ -181,18 +265,26 @@ namespace gh_sofistik
 
       private void Menu_OnOpenTeddy(Object sender, EventArgs e)
       {
-         if(System.IO.Path.GetExtension(_path_active) == ".dat")
+         if (string.IsNullOrEmpty(_sofistik_exe_path))
          {
-            if(System.IO.File.Exists(_path_active))
-            {
-               var process = new System.Diagnostics.Process();
-               process.StartInfo.FileName = _path_active;
+            MessageBox.Show("SOFiSTiK Binary path must be provided to open Teddy!", "SOFiSTiK");
+            return;
+         }
 
-               if (!process.Start())
-                  MessageBox.Show("Unable to open SOFiSTiK Text Editor? Is SOFiSTiK already installed?", "SOFiSTiK");
-            }
-            else
-               MessageBox.Show("SOFiSTiK dat fil to be opened does not exist:\n" + _path_active, "SOFiSTiK");
+         var dat_path = System.IO.Path.ChangeExtension(_path_active, ".dat");
+         if (System.IO.File.Exists(dat_path))
+         {
+            var process = new System.Diagnostics.Process();
+            var executable = _sofistik_exe_path + "ted.exe";
+            var arguments = "\"" + dat_path + "\"";
+            process.StartInfo.FileName = executable;
+            process.StartInfo.Arguments = arguments;
+            if (!process.Start())
+               MessageBox.Show("Unable to open SOFiSTiK Text Editor. Is SOFiSTiK already installed?\n" + executable, "SOFiSTiK");
+         }
+         else
+         { 
+            MessageBox.Show("SOFiSTiK dat file to be opened does not exist:\n" + dat_path, "SOFiSTiK");
          }
       }
 
@@ -201,6 +293,10 @@ namespace gh_sofistik
          // stream content into file
          using (var sw = new System.IO.StreamWriter(path, false))
          {
+            if (!string.IsNullOrEmpty(_sofistik_project_name))
+            {
+               sw.Write("#define project=" + _sofistik_project_name +"\n");
+            }
             foreach (var txt in text_input)
             {
                sw.Write(txt);

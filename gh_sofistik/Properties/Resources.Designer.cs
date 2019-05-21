@@ -63,6 +63,16 @@ namespace gh_sofistik.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        public static System.Drawing.Bitmap feabench_24x24 {
+            get {
+                object obj = ResourceManager.GetObject("feabench_24x24", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         public static System.Drawing.Bitmap file_dat_24x24 {
             get {
                 object obj = ResourceManager.GetObject("file_dat_24x24", resourceCulture);

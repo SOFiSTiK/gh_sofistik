@@ -2,13 +2,81 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
+using GH_IO.Serialization;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
 namespace gh_sofistik
 {
+   //public interface IGS_LoadCase
+   //{
+   //   int LoadCase { get; }
+   //}
+   
+   public class GS_LoadCase : GH_Goo<Object> //, IGS_LoadCase
+   {
+      public int Id { get; set; } = 0;
+      public string Type { get; set; } = string.Empty;
+      public double Facd { get; set; } = 0.0;
+      public string Title { get; set; } = string.Empty;
+
+      public GS_LoadCase()
+      {
+         this.Id = 0;
+         this.Facd = 0.0;
+         this.Type = string.Empty;
+         this.Title = string.Empty;
+      }
+      // Copy Constructor
+      public GS_LoadCase(GS_LoadCase GS_LoadCaseSource)
+      {
+         this.Id = GS_LoadCaseSource.Id;
+         this.Facd = GS_LoadCaseSource.Facd;
+         this.Type = GS_LoadCaseSource.Type;
+         this.Title = GS_LoadCaseSource.Title;
+         this.Value = GS_LoadCaseSource.Value;
+      }
+
+      public override string ToString()
+      {
+         return ToCadinp();
+      }
+
+      // GS_LoadCase instances are always valid
+      public override bool IsValid
+      {
+         get { return true; }
+      }
+
+      public override string TypeName
+      {
+         get { return "GS_LoadCase";  }
+      }
+
+      public override string TypeDescription
+      {
+         get { return "Basic LoadCase information (Id, Type, Title, Facd)"; }
+      }
+
+      public override IGH_Goo Duplicate()
+      {
+         return new GS_LoadCase(this);
+      }
+
+      public string ToCadinp()
+      {
+         var sb = new StringBuilder();
+         sb.Clear();
+         sb.AppendFormat("LC {0} TYPE {1}", Id, Type);
+         if (Math.Abs(Facd) > 0.0)
+            sb.AppendFormat(" FACD {0:F3}", Facd);
+         if (string.IsNullOrEmpty(Title) == false)
+            sb.AppendFormat(" TITL {0}", Title);
+
+         return sb.ToString();
+      }
+   }
 
    public class CreateLoadCase : GH_Component
    {
@@ -37,6 +105,7 @@ namespace gh_sofistik
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
          pManager.AddTextParameter("Lc", "Lc", "SOFiLOAD Input", GH_ParamAccess.list);
+         pManager.AddGenericParameter("Lc object", "Lc object", "LoadCase object", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -47,6 +116,9 @@ namespace gh_sofistik
          var titls = da.GetDataList<string>(3);
 
          var load_cases = new List<string>();
+         var gs_load_cases = new List<GS_LoadCase>();
+
+
 
          var sb = new StringBuilder();
 
@@ -60,18 +132,37 @@ namespace gh_sofistik
             var titl = titls.GetItemOrLast(i);
 
             if (type == string.Empty) type = "NONE";
+            if (Math.Abs(facd) < 1.0E-6)
+            {
+               facd = 0.0;
+            }
 
-            sb.AppendFormat("LC {0} TYPE {1}", id, type);
-            if (Math.Abs(facd) > 1.0E-6)
-               sb.AppendFormat(" FACD {0:F3}", facd);
-            if (string.IsNullOrEmpty(titl) == false)
-               sb.AppendFormat(" TITL {0}", titl);
-            sb.AppendLine();
+            if (id <= 0)
+            {
+               continue;
+            }
 
-            load_cases.Add(sb.ToString());
+            var lc = new GS_LoadCase()
+            {
+               Id = id,
+               Type = type,
+               Facd = facd,
+               Title = titl
+            };
+            gs_load_cases.Add(lc);
+
+            //sb.AppendFormat("LC {0} TYPE {1}", id, type);
+            //if (Math.Abs(facd) > 0.0)
+            //   sb.AppendFormat(" FACD {0:F3}", facd);
+            //if (string.IsNullOrEmpty(titl) == false)
+            //   sb.AppendFormat(" TITL {0}", titl);
+            //sb.AppendLine();
+
+            //load_cases.Add(sb.ToString());
+            load_cases.Add(lc.ToCadinp());
          }
-
          da.SetDataList(0, load_cases);
+         da.SetDataList(1, gs_load_cases);
       }
    }
 

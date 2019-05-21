@@ -60,6 +60,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="src\gh_feabench.cs" />
     <Compile Include="src\gh_spring.cs" />
     <Compile Include="src\gh_elastic_coupling.cs" />
     <Compile Include="src\gh_calculate.cs" />
@@ -203,6 +204,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>copy "$(TargetPath)" "$(TargetDir)$(ProjectName).gha"
+copy "$(TargetPath)" "C:\Users\hh\AppData\Roaming\Grasshopper\Libraries\$(ProjectName).gha"
 erase "$(TargetPath)"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
