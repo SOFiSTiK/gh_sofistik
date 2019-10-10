@@ -10,7 +10,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public interface IGS_StructuralElement
    {
@@ -74,7 +74,7 @@ namespace gh_sofistik
          return new GS_StructuralPoint()
          {
             Value = new Point(this.Value.Location),
-            Id = this.Id,
+            Id = 0,
             DirectionLocalX = this.DirectionLocalX,
             DirectionLocalZ = this.DirectionLocalZ,
             FixLiteral = this.FixLiteral,
@@ -272,13 +272,20 @@ namespace gh_sofistik
    // create structural point
    public class CreateStructuralPoint : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateStructuralPoint()
          : base("Structural Point", "Structural Point", "Creates SOFiSTiK Structural Points", "SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_point_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_point_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

@@ -6,67 +6,22 @@ using Rhino.Geometry;
 using Rhino;
 using Rhino.DocObjects;
 
-namespace gh_sofistik.src
+namespace gh_sofistik.Open
 {
    public class GH_CouplingStruc
    {
-      private Point _a_point;
-      private Point _b_point;
-      private Curve _a_curve;
-      private Curve _b_curve;
-
-      public bool IsACurve { get; set; } = false;
-      public bool IsBCurve { get; set; } = false;
-
       public IGS_StructuralElement Reference_A { get; set; }
-
       public IGS_StructuralElement Reference_B { get; set; }
 
+      public bool IsACurve { get { return Reference_A != null && Reference_A is GS_StructuralLine; } }
+      public bool IsBCurve { get { return Reference_B != null && Reference_B is GS_StructuralLine; } }
+
+      public Curve CurveA { get { if (IsACurve) return (Reference_A as GS_StructuralLine).Value; else return null; } }
+      public Curve CurveB { get { if (IsBCurve) return (Reference_B as GS_StructuralLine).Value; else return null; } }
+      public Point PointA { get { if (!IsACurve) return (Reference_A as GS_StructuralPoint).Value; else return null; } }
+      public Point PointB { get { if (!IsBCurve) return (Reference_B as GS_StructuralPoint).Value; else return null; } }
+
       public enum State { OK, InvalidA, InvalidB, Modified };
-
-      public void SetA(Point p)
-      {
-         _a_point = p;
-         IsACurve = false;
-      }
-
-      public void SetA(Curve c)
-      {
-         _a_curve = c;
-         IsACurve = true;
-      }
-
-      public void SetB(Point p)
-      {
-         _b_point = p;
-         IsBCurve = false;
-      }
-
-      public void SetB(Curve c)
-      {
-         _b_curve = c;
-         IsBCurve = true;
-      }
-
-      public Point PointA
-      {
-         get { return _a_point; }
-      }
-
-      public Curve CurveA
-      {
-         get { return _a_curve; }
-      }
-
-      public Point PointB
-      {
-         get { return _b_point; }
-      }
-
-      public Curve CurveB
-      {
-         get { return _b_curve; }
-      }
 
       public Enum SetInput(IGH_GeometricGoo gg, bool a)
       {
@@ -119,28 +74,16 @@ namespace gh_sofistik.src
             if (a)
             {
                if (isPoint)
-               {
-                  SetA(spt.Value);
                   Reference_A = spt;
-               }
                else
-               {
-                  SetA(sln.Value);
                   Reference_A = sln;
-               }
             }
             else
             {
                if (isPoint)
-               {
-                  SetB(spt.Value);
                   Reference_B = spt;
-               }
                else
-               {
-                  SetB(sln.Value);
                   Reference_B = sln;
-               }
             }
          }
 
@@ -166,12 +109,9 @@ namespace gh_sofistik.src
       }
 
       private void swapInputs()
-      {
-         Point pa_temp = PointA;
+      {         
          IGS_StructuralElement pRef_temp = Reference_A;
-         SetA(CurveB);
          Reference_A = Reference_B;
-         SetB(pa_temp);
          Reference_B = pRef_temp;
       }
 
@@ -361,19 +301,20 @@ namespace gh_sofistik.src
       {
          GH_Coupling nc = new GH_Coupling();
          nc.Value = new GH_CouplingStruc();
-         if (!(Value.Reference_A is null))
-            nc.Value.Reference_A = Value.Reference_A;
-         if (!(Value.Reference_B is null))
-            nc.Value.Reference_B = Value.Reference_B;
-         if (Value.IsACurve)
-            nc.Value.SetA(Value.CurveA.DuplicateCurve());
-         else
-            nc.Value.SetA(new Point(Value.PointA.Location));
-         if (Value.IsBCurve)
-            nc.Value.SetB(Value.CurveB.DuplicateCurve());
-         else
-            nc.Value.SetB(new Point(Value.PointB.Location));
-
+         if (Value.Reference_A != null)
+         {
+            if (Value.IsACurve)
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralLine).DuplicateGeometry() as GS_StructuralLine;
+            else
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralPoint).DuplicateGeometry() as GS_StructuralPoint;
+         }
+         if (Value.Reference_B != null)
+         {
+            if (Value.IsBCurve)
+               nc.Value.Reference_B = (Value.Reference_B as GS_StructuralLine).DuplicateGeometry() as GS_StructuralLine;
+            else
+               nc.Value.Reference_B = (Value.Reference_B as GS_StructuralPoint).DuplicateGeometry() as GS_StructuralPoint;
+         }
          nc.GroupId = GroupId;
          nc.FixLiteral = FixLiteral;
          return nc;
@@ -420,6 +361,8 @@ namespace gh_sofistik.src
 
    public class CreateCoupling : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateCoupling()
             : base("Coupling", "Coupling", "Creates SOFiSTiK Point/Point, Point/Line or Line/Line Coupling", "SOFiSTiK", "Structure")
       { }
@@ -434,7 +377,12 @@ namespace gh_sofistik.src
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_constraint_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_constraint_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace gh_sofistik.src
+namespace gh_sofistik.Open
 {
 
    public class GH_Elastic_Coupling : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
@@ -119,20 +119,20 @@ namespace gh_sofistik.src
       {
          GH_Elastic_Coupling nc = new GH_Elastic_Coupling();
          nc.Value = new GH_CouplingStruc();
-         if (!(Value.Reference_A is null))
-            nc.Value.Reference_A = Value.Reference_A;
-         if (!(Value.Reference_B is null))
-            nc.Value.Reference_B = Value.Reference_B;
-
-         if (Value.IsACurve)
-            nc.Value.SetA(Value.CurveA.DuplicateCurve());
-         else
-            nc.Value.SetA(new Point(Value.PointA.Location));
-         if (Value.IsBCurve)
-            nc.Value.SetB(Value.CurveB.DuplicateCurve());
-         else
-            nc.Value.SetB(new Point(Value.PointB.Location));
-
+         if (Value.Reference_A != null)
+         {
+            if (Value.IsACurve)
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralLine).DuplicateGeometry() as GS_StructuralLine;
+            else
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralPoint).DuplicateGeometry() as GS_StructuralPoint;
+         }
+         if (Value.Reference_B != null)
+         {
+            if (Value.IsBCurve)
+               nc.Value.Reference_B = (Value.Reference_B as GS_StructuralLine).DuplicateGeometry() as GS_StructuralLine;
+            else
+               nc.Value.Reference_B = (Value.Reference_B as GS_StructuralPoint).DuplicateGeometry() as GS_StructuralPoint;
+         }
          nc.GroupId = GroupId;
          nc.Axial_stiffness = Axial_stiffness;
          nc.Rotational_stiffness = Rotational_stiffness;
@@ -181,6 +181,8 @@ namespace gh_sofistik.src
 
    public class CreateElasticCoupling : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateElasticCoupling()
             : base("Elastic Coupling", "Elastic Coupling", "Creates SOFiSTiK Point/Point, Point/Line or Line/Line Elastic Coupling", "SOFiSTiK", "Structure")
       { }
@@ -195,7 +197,12 @@ namespace gh_sofistik.src
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_elastic_constraint_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_elastic_constraint_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

@@ -6,10 +6,9 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{DCF9DA79-953C-4C46-A528-939CC0998102}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>gh_sofistik</RootNamespace>
     <AssemblyName>gh_experimental</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -34,15 +33,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="GH_IO">
-      <HintPath>..\..\..\..\..\Program Files\Rhino 6\Plug-ins\Grasshopper\GH_IO.dll</HintPath>
+      <HintPath>C:\Program Files\Rhino 6\Plug-ins\Grasshopper\GH_IO.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Grasshopper">
-      <HintPath>..\..\..\..\..\Program Files\Rhino 6\Plug-ins\Grasshopper\Grasshopper.dll</HintPath>
+      <HintPath>C:\Program Files\Rhino 6\Plug-ins\Grasshopper\Grasshopper.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="RhinoCommon">
-      <HintPath>..\..\..\..\..\Program Files\Rhino 6\System\RhinoCommon.dll</HintPath>
+      <HintPath>C:\Program Files\Rhino 6\System\RhinoCommon.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
@@ -56,86 +55,26 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
     <Compile Include="src\gh_experimental.cs" />
     <Compile Include="src\gh_helper.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>PublicResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\structural_line16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\structural_point16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\structural_area16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\sofistik_32x32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\animator24.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\winps24.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Resources\" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\1_Teddy_Icon_16x16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\animator16.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\folder-open-icon 16x16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\wps.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\animator.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\teddy 16x16.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\animator 16x16.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\design\structural_point_32x32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\design\structural_point_24x24.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\sofistik_24.bmp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\structural_line-load-1.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\structural_point_load.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\calculate01.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\sofiload01.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\img\sofimshc01.png" />
+    <EmbeddedResource Include="src\embedded\images\file_dat_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\loadcase_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\sofiload_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\sofimshc_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\sofistik_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_area_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_area_load_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_axis_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_constraint_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_elastic_constraint_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_line_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_line_load_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_point_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_point_load_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\structural_spring_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\user_options_24x24.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

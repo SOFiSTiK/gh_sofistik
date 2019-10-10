@@ -10,7 +10,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class GS_LineLoad : GH_GeometricGoo<Curve>, IGS_Load, IGH_PreviewData
    {
@@ -132,13 +132,20 @@ namespace gh_sofistik
 
    public class CreateLineLoad : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateLineLoad()
          : base("Line Load", "Line Load", "Creates SOFiSTiK Line Loads", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_line_load_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_line_load_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

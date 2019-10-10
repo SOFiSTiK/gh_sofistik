@@ -10,7 +10,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public interface IGS_Load
    {
@@ -160,13 +160,20 @@ namespace gh_sofistik
 
    public class CreatePointLoad : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreatePointLoad()
          : base("Point Load","Point Load","Creates SOFiSTiK Point Loads", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_point_load_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_point_load_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

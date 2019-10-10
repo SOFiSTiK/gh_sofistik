@@ -11,13 +11,14 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class TextStream : GH_Component
    {
       private string _path_by_dialog = string.Empty;
       private string _path_active = string.Empty;
       private bool _stream_content = true;
+      private System.Drawing.Bitmap _icon;
 
       public TextStream()
          : base("Text File", "TextFile", "Streams the given input to a text file (e.g. SOFiSTiK *.dat input)", "SOFiSTiK", "General")
@@ -35,7 +36,12 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.file_dat_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "file_dat_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid

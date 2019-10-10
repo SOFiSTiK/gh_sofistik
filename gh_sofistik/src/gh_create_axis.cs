@@ -10,18 +10,25 @@ using Rhino.DocObjects;
 using Rhino.Geometry;
 
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    // creates SOFiSTiK axis input from a curve definition in GH
    public class CreateGeometricAxis : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateGeometricAxis()
          : base("Geometric Axis","Geom Axis", "Creates a SOFiSTiK geometry axis definition from a curve","SOFiSTiK","Geometry")
       {}
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_axis_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_axis_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -51,8 +58,6 @@ namespace gh_sofistik
          // over all curves passed in
          for(int ic = 0; ic<curves.Count; ++ic)
          {
-            var sb = new StringBuilder(1024);
-
             var c = curves[ic];
 
             // identifier
@@ -73,37 +78,7 @@ namespace gh_sofistik
             if (string.IsNullOrWhiteSpace(type))
                type = "LANE";
 
-            // write
-            if(c is LineCurve)
-            {
-               sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
-               AppendLineDefinition(sb, c);
-            }
-            else if(c is ArcCurve)
-            {
-               sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
-               AppendArcDefinition(sb, (c as ArcCurve));
-            }
-            else
-            {
-               NurbsCurve nb = (c as NurbsCurve) ?? c.ToNurbsCurve();
-               if (nb == null)
-                  throw new Exception("Unable to cast Curve at index " + (ic+1).ToString() + " to NurbsCurve");
-
-               if(nb.Knots.Count==2 && nb.Degree==1)
-               {
-                  sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
-                  AppendLineDefinition(sb, nb);
-               }
-               else
-               {
-                  sb.AppendFormat("GAX {0} TYPE {1} TYPC NURB DEGR {2}\n", name, type, nb.Degree);
-                  AppendNurbsDefinition(sb, nb);
-               }
-            }
-            sb.AppendLine();
-
-            definitions.Add(sb.ToString());
+            definitions.Add(GetGeometryAxisDefinition(c, name, type));
             lengths.Add(c.GetLength());
          }
 
@@ -116,7 +91,42 @@ namespace gh_sofistik
          get { return new Guid("E0EE9840-CF44-4550-9640-2A0E56C1C768"); }
       }
 
-      private void AppendLineDefinition(StringBuilder sb, Curve c)
+      public static string GetGeometryAxisDefinition(Curve crv, string name, string type)
+      {
+         var sb = new StringBuilder(1024);
+         // write
+         if (crv is LineCurve)
+         {
+            sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
+            AppendLineDefinition(sb, crv);
+         }
+         else if (crv is ArcCurve)
+         {
+            sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
+            AppendArcDefinition(sb, (crv as ArcCurve));
+         }
+         else
+         {
+            NurbsCurve nb = (crv as NurbsCurve) ?? crv.ToNurbsCurve();
+            if (nb == null)
+               throw new Exception("Unable to cast Curve " + name + " to NurbsCurve");
+
+            if (nb.Knots.Count == 2 && nb.Degree == 1)
+            {
+               sb.AppendFormat("GAX {0} TYPE {1}\n", name, type);
+               AppendLineDefinition(sb, nb);
+            }
+            else
+            {
+               sb.AppendFormat("GAX {0} TYPE {1} TYPC NURB DEGR {2}\n", name, type, nb.Degree);
+               AppendNurbsDefinition(sb, nb);
+            }
+         }
+         sb.AppendLine();
+         return sb.ToString();
+      }
+
+      private static void AppendLineDefinition(StringBuilder sb, Curve c)
       {
          Point3d pa = c.PointAt(0);
          Point3d pe = c.PointAt(1);
@@ -126,7 +136,7 @@ namespace gh_sofistik
          sb.AppendLine();
       }
 
-      private void AppendArcDefinition(StringBuilder sb, ArcCurve ar)
+      private static void AppendArcDefinition(StringBuilder sb, ArcCurve ar)
       {
          Point3d pa = ar.PointAtStart;
          Point3d pe = ar.PointAtEnd;
@@ -140,7 +150,7 @@ namespace gh_sofistik
          sb.AppendLine();
       }
 
-      private void AppendNurbsDefinition(StringBuilder sb, NurbsCurve nb)
+      private static void AppendNurbsDefinition(StringBuilder sb, NurbsCurve nb)
       {
          double l = nb.GetLength();
          double k0 = nb.Knots[0];

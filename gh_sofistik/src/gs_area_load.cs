@@ -10,7 +10,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class GS_AreaLoad : GH_GeometricGoo<Brep>, IGS_Load, IGH_PreviewData
    {
@@ -126,8 +126,13 @@ namespace gh_sofistik
          {
             //   iterate over Edges of current face and draw this edge
             foreach (int beIndex in bf.AdjacentEdges())
-            {  
-               _loadCondition.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value.Edges[beIndex], UseHostLocal, lx, bf, DrawUtil.ScaleFactorLoads, DrawUtil.DensityFactorLoads));
+            {
+               var txList = DrawUtil.GetCurveTransforms(Value.Edges[beIndex], UseHostLocal, lx, bf, DrawUtil.ScaleFactorLoads, DrawUtil.DensityFactorLoads);
+               if (ReferenceArea != null && UseHostLocal && ReferenceArea.FlipZ)
+                  foreach (var tx in txList)
+                     _loadCondition.Transforms.Add(tx * Rhino.Geometry.Transform.Rotation(Math.PI, Vector3d.XAxis, Point3d.Origin));
+               else
+                  _loadCondition.Transforms.AddRange(txList);
             }
          }
       }
@@ -155,13 +160,20 @@ namespace gh_sofistik
 
    public class CreateAreaLoad : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateAreaLoad()
          : base("Area Load", "Area Load", "Creates SOFiSTiK Area Loads", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_area_load_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_area_load_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

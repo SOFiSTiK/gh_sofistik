@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using Grasshopper.Kernel;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class CreateGlobalSettings : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateGlobalSettings() : base("Global Settings ", "Settings", "Global settings for scaling load arrows / adjusting colors / etc.", "SOFiSTiK", "General")
       {
       }
@@ -20,7 +22,12 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.user_options_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "user_options_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

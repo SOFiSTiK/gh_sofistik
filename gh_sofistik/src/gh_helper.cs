@@ -12,7 +12,7 @@ using Rhino.Geometry;
 namespace gh_sofistik
 {
    // extends linq queries
-   static class LinqExtension
+   public static class LinqExtension
    {
       public static T GetItemOrLast<T>(this IList<T> list, int index)
       {
@@ -40,7 +40,7 @@ namespace gh_sofistik
    }
 
    // extends the IGH interface
-   static class IGH_Extension
+   public static class IGH_Extension
    {
       // extends the GetData method
       public static T GetData<T>(this IGH_DataAccess da, int index)
@@ -73,7 +73,7 @@ namespace gh_sofistik
       }
    }
 
-   static class Util
+   public static class Util
    {
       public static bool CastCurveTo<Q>(Rhino.Geometry.Curve curve, out Q target)
       {
@@ -154,6 +154,36 @@ namespace gh_sofistik
          }
          return new Tuple<int, int>(id_start, id_end);
       }
+
+      public static System.Drawing.Bitmap GetBitmap(System.Reflection.Assembly assembly, string name)
+      {
+         try
+         {
+            string trunkAssemblyPath = "SOFiSTiK.";
+            string gitAssemblyPath = "gh_sofistik.src.";
+            string path = trunkAssemblyPath;
+            if (assembly.ManifestModule.Name == "gh_sofistik.gha")
+               path = gitAssemblyPath;
+            var stream = assembly.GetManifestResourceStream(path + "embedded.images." + name);
+            if (stream == null)
+               return null;
+            return new System.Drawing.Bitmap(System.Drawing.Image.FromStream(stream));
+         }
+         catch
+         {
+            return null;
+         }
+      }
+
+      public static bool IsOnCurve(Curve mainCrv, Curve subCrv, double tolerance)
+      {
+         if (mainCrv.GetBoundingBox(false).Contains(subCrv.GetBoundingBox(false), false))
+            if (mainCrv.ClosestPoint(subCrv.PointAtStart, out var tA, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtNormalizedLength(0.5), out var tM, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtEnd, out var tE, tolerance))
+               if ((mainCrv.TangentAt(tA) - subCrv.TangentAtStart).IsTiny(tolerance) && (mainCrv.TangentAt(tE) - subCrv.TangentAtEnd).IsTiny(tolerance))
+                  return true;
+         return false;
+      }
+
    }
 
    static class DrawUtil
@@ -382,10 +412,11 @@ namespace gh_sofistik
             dx = plane.XAxis;
 
          // orient towards global negative z (own weight)
-         Vector3d dz = (Vector3d.ZAxis * plane.ZAxis > 0) ? -1 * plane.ZAxis : plane.ZAxis;
+         //Vector3d dz = (Vector3d.ZAxis * plane.ZAxis > 0) ? -1 * plane.ZAxis : plane.ZAxis;
+         // dont orient towards global negative z(ownweight). now orient z towards crossproduct of u v aka plane normal
+         Vector3d dz = plane.ZAxis;
 
          return GetGlobalTransformPoint(dx, dz);
-
       }
 
       public static Transform GetGlobalTransformLine(Vector3d tangent, Vector3d refLZ)
@@ -1154,7 +1185,8 @@ namespace gh_sofistik
 
          public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
          {
-            pipeline.DrawPatternedLine(_line, col, 0x00110101, 3);
+            //pipeline.DrawPatternedLine(_line, col, 0x00110101, 3);
+            pipeline.DrawPatternedLine(_line, col, 0x00001111, 5);
          }
       }
 

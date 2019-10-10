@@ -9,7 +9,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    // class implementing a GH_ container for Rhino.Geometry.Curve
    public class GS_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
@@ -68,7 +68,7 @@ namespace gh_sofistik
          return new GS_StructuralLine()
          {
             Value = this.Value.DuplicateCurve(),
-            Id = this.Id,
+            Id = 0,
             GroupId = this.GroupId,
             SectionIdStart = this.SectionIdStart,
             SectionIdEnd = this.SectionIdEnd,
@@ -260,13 +260,20 @@ namespace gh_sofistik
    // create structural line
    public class CreateStructuralLine : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateStructuralLine()
          : base("Structural Line","Structural Line","Creates SOFiSTiK Structural Lines","SOFiSTiK", "Structure")
       {}
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_line_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_line_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)

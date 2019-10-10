@@ -7,18 +7,25 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
 
    public class CreateLoadCase : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateLoadCase()
          : base("LoadCase", "LoadCase", "Defines Load Cases for SOFiLOAD", "SOFiSTiK", "Loads")
       {}
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.loadcase_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "loadcase_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid
@@ -77,13 +84,20 @@ namespace gh_sofistik
 
    public class CreateSofiloadInput : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateSofiloadInput()
          : base("SOFiLOAD", "SOFiLOAD", "Creates a SOFiLOAD input file", "SOFiSTiK", "Loads")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofiload_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "sofiload_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid

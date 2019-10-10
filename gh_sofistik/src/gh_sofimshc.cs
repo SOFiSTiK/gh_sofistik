@@ -2,15 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using gh_sofistik.src;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class CreateSofimshcInput : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
       private BoundingBox _boundingBox=new BoundingBox();
 
       public CreateSofimshcInput()
@@ -19,7 +19,12 @@ namespace gh_sofistik
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofimshc_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "sofimshc_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid
@@ -34,9 +39,10 @@ namespace gh_sofistik
          pManager.AddBooleanParameter("Create mesh", "Create Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
          pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 0.0);
          pManager.AddNumberParameter("Intersection tolerance", "Tolerance", "Geometric intersection tolerance in [m]", GH_ParamAccess.item, 0.01);
-         pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned element numbers", GH_ParamAccess.item, 10000);
+         pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned Structural Element numbers", GH_ParamAccess.item, 1000);
+         pManager.AddIntegerParameter("Group Divisor", "Group Divisor", "Group Divisor for assigning Element Numbers to a Group", GH_ParamAccess.item, -1000);
          pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
-         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of structural elements", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of Structural Elements", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -61,17 +67,22 @@ namespace gh_sofistik
          double hmin = da.GetData<double>(3);
          double tolg = da.GetData<double>(4);
          int idBorder = da.GetData<int>(5);
-         string ctrl = da.GetData<string>(6);
-         string text = da.GetData<string>(7);
+         int gdiv = da.GetData<int>(6);
+         string ctrl = da.GetData<string>(7);
+         string text = da.GetData<string>(8);
 
          var structural_elements_pre = new List<IGS_StructuralElement>();
          var structural_elements = new List<IGS_StructuralElement>();
          List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information = new List<GH_GeometricGoo<GH_CouplingStruc>>();
+         var axis_elements = new List<IGH_Axis>();
 
          foreach (var it in da.GetDataList<IGH_Goo>(0))
          {
             if (it is IGS_StructuralElement)
                structural_elements_pre.Add(it as IGS_StructuralElement);
+
+            else if (it is IGH_Axis)
+               axis_elements.Add(it as IGH_Axis);
 
             else if (it is GH_GeometricGoo<GH_CouplingStruc>)
                coupling_information.Add(it as GH_GeometricGoo<GH_CouplingStruc>);
@@ -80,19 +91,28 @@ namespace gh_sofistik
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_StructuralElement.");
          }
 
+         
+         // setup data for id distribution and pre-processing
          int id = idBorder;
          SortedSet<int> idSetPoint = new SortedSet<int>();
          SortedSet<int> idSetLine = new SortedSet<int>();
          // assign auto generated IDs temporarily (just for couplings) and write "Id=0" back at end of this method
          List<IGS_StructuralElement> write_id_back_to_zero = new List<IGS_StructuralElement>();
+                  
          //id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
-         addUnknownElementsFromCouplings(id, idSetPoint, idSetLine, structural_elements, coupling_information, write_id_back_to_zero);
+         id = addUnknownElementsFromCouplings(id, idSetPoint, idSetLine, structural_elements, coupling_information, write_id_back_to_zero);
          addStructuralElements(idSetPoint, idSetLine, structural_elements, structural_elements_pre);
          
          // build hashmap for couplings: for one id (key), you get a list of couplings in which this structural element is involved
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapPoint = buildCouplingMap(coupling_information, false);
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapLine = buildCouplingMap(coupling_information, true);
 
+         // pre-process axis elements and perform check for structural lines if they lie on axis
+         var gaxDefinitions = new StringBuilder();
+         var axisAdded = getAxisDefinitions(axis_elements, gaxDefinitions);
+         var slnReferences = calcSlnReferences(structural_elements, axisAdded, tolg, write_id_back_to_zero, ref id);
+
+         // init boundingbox
          _boundingBox = new BoundingBox();
          if (structural_elements.Count > 0) {
             IGS_StructuralElement se = structural_elements[0];
@@ -104,14 +124,16 @@ namespace gh_sofistik
                _boundingBox = (se as GS_StructuralArea).Boundingbox;
          }
 
+         // write teddy
          var sb = new StringBuilder();
 
          sb.AppendLine("+PROG SOFIMSHC");
          sb.AppendLine("HEAD");
          sb.AppendLine("PAGE UNII 0"); // export always in SOFiSTiK database units
 
-         if(initSystem)
-            sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
+         if (initSystem)
+            sb.AppendLine("SYST 3D GDIR NEGZ GDIV " + gdiv);
+         //sb.AppendLine("SYST 3D GDIR NEGZ GDIV -1000");
          else
             sb.AppendLine("SYST REST");
 
@@ -127,12 +149,17 @@ namespace gh_sofistik
             sb.Append(ctrl);
          sb.AppendLine();
 
-         // write structural lines
+         // write axis elements
+         sb.Append(gaxDefinitions.ToString());
+
+         // write structural elements
          foreach (var se in structural_elements)
          {
+            // write structural points
             if (se is GS_StructuralPoint)
             {
                var spt = se as GS_StructuralPoint;
+               
                Point3d p = spt.Value.Location;
 
                _boundingBox.Union(spt.Boundingbox);
@@ -168,13 +195,14 @@ namespace gh_sofistik
                string id_group = sln.GroupId > 0 ? sln.GroupId.ToString() : "-";
 
                string id_section = "-";
-               if(sln.SectionIdStart>0)
+
+               if (sln.SectionIdStart > 0)
                {
                   if (sln.SectionIdEnd == 0 || sln.SectionIdEnd == sln.SectionIdStart)
                      id_section = sln.SectionIdStart.ToString();
                   else
                      id_section = string.Format("\"{0}.{1}\"", sln.SectionIdStart, sln.SectionIdEnd);
-               }
+               }               
 
                sb.AppendFormat("SLN {0} GRP {1} SNO {2}", id_string, id_group, id_section);
 
@@ -194,9 +222,16 @@ namespace gh_sofistik
                if (string.IsNullOrWhiteSpace(sln.UserText) == false)
                   sb.AppendFormat(" {0}", sln.UserText);
 
-               sb.AppendLine();
-
-               AppendCurveGeometry(sb, sln.Value);
+               if(slnReferences.TryGetValue(sln.Id, out var refs))
+               {
+                  sb.AppendFormat(" REF '" + refs.Item1 + "' NPA " + refs.Item2 + " NPE " + refs.Item3);
+                  sb.AppendLine();
+               }
+               else
+               {
+                  sb.AppendLine();
+                  AppendCurveGeometry(sb, sln.Value);
+               }
 
                AppendCouplingInformation(sb, se, couplingMapLine);
             }
@@ -265,7 +300,7 @@ namespace gh_sofistik
                      AppendSurfaceGeometry(sb, fc.ToNurbsSurface());
                   }
                }
-            }
+            }            
             else
             {
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unsupported type encountered: " + se.TypeName);
@@ -290,6 +325,95 @@ namespace gh_sofistik
       }
 
       #region Id distribution and preprocessing
+
+      private List<(string, Curve)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions)
+      {
+         var addedAxis = new List<(string, Curve)>();         
+         foreach (var ax in axis_elements)
+         {
+            var res = ax.GetAxisDefinition(axisDefinitions, addedAxis);
+            if (res.Item1 != GH_RuntimeMessageLevel.Blank)
+               AddRuntimeMessage(res.Item1, res.Item2);
+         }
+         return addedAxis;
+      }
+      
+      private Dictionary<int, (string, string, string)> calcSlnReferences(List<IGS_StructuralElement> structural_elements, List<(string, Curve)> addedAxis, double tolg, List<IGS_StructuralElement> write_id_back_to_zero, ref int id) { 
+
+         //collect structural pts
+         var sptList = new List<GS_StructuralPoint>();
+         foreach (var se in structural_elements)
+            if (se is GS_StructuralPoint)
+               sptList.Add(se as GS_StructuralPoint);
+
+         //check structural lines if they lie on existing axis, if yes save axis + pointStart/End reference ids
+         //check if points at start/end correspond to existing structural pts, if not create them
+         //check if structural pts at start/end have ids, if not assign ids
+         Dictionary<int, (string, string, string)> slnReferences = new Dictionary<int, (string, string, string)>();
+         List<GS_StructuralPoint> addAfter = new List<GS_StructuralPoint>();
+         foreach (var se in structural_elements)
+         {
+            if (se is GS_StructuralLine)
+            {
+               var sln = se as GS_StructuralLine;
+
+               //check if sln lies on existing gax               
+               foreach (var ax in addedAxis)
+               {
+                  if (Util.IsOnCurve(ax.Item2, sln.Value, tolg))
+                  {
+                     string axRef = ax.Item1;
+
+                     GS_StructuralPoint sptA = null;
+                     GS_StructuralPoint sptE = null;
+                     foreach (var spt in sptList)
+                     {
+                        if (spt.Value.Location.DistanceTo(sln.Value.PointAtStart) < tolg)
+                           sptA = spt;
+                        if (spt.Value.Location.DistanceTo(sln.Value.PointAtEnd) < tolg)
+                           sptE = spt;
+                     }
+                     if (sptA == null)
+                     {
+                        sptA = new GS_StructuralPoint();
+                        sptA.Value = new Point(sln.Value.PointAtStart);
+                        addAfter.Add(sptA);
+                        sptList.Add(sptA);
+                     }
+                     if (sptE == null)
+                     {
+                        sptE = new GS_StructuralPoint();
+                        sptE.Value = new Point(sln.Value.PointAtEnd);
+                        addAfter.Add(sptE);
+                        sptList.Add(sptE);
+                     }
+                     if (sptA.Id == 0)
+                     {
+                        sptA.Id = ++id;
+                        write_id_back_to_zero.Add(sptA);
+                     }
+                     if (sptE.Id == 0)
+                     {
+                        sptE.Id = ++id;
+                        write_id_back_to_zero.Add(sptE);
+                     }
+
+                     if (sln.Id == 0)
+                     {
+                        sln.Id = ++id;
+                        write_id_back_to_zero.Add(sln);
+                     }
+
+                     slnReferences.Add(sln.Id, (axRef, sptA.Id.ToString(), sptE.Id.ToString()));
+
+                     break;
+                  }
+               }
+            }
+         }
+         structural_elements.AddRange(addAfter);
+         return slnReferences;
+      }
 
       private int assignIDs(int id, SortedSet<int> idSet, List<IGS_StructuralElement> structural_elements, List<IGS_StructuralElement> write_id_back_to_zero)
       {
@@ -564,6 +688,7 @@ namespace gh_sofistik
 
          sb.AppendFormat(" CP {0}", spr.Axial_stiffness);
          sb.AppendFormat(" CM {0}", spr.Rotational_stiffness);
+         sb.AppendFormat(" CQ {0}", spr.Transversal_stiffness);
 
          if (!spr.Direction.IsTiny())
             sb.AppendFormat(" DX {0} DY {1} DZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
@@ -583,6 +708,7 @@ namespace gh_sofistik
 
          sb.AppendFormat(" CA {0}", spr.Axial_stiffness);
          sb.AppendFormat(" CD {0}", spr.Rotational_stiffness);
+         sb.AppendFormat(" CL {0}", spr.Transversal_stiffness);
 
          if (!spr.Direction.IsTiny())
             sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", spr.Direction.X, spr.Direction.Y, spr.Direction.Z);
@@ -803,5 +929,11 @@ namespace gh_sofistik
 
       #endregion
    }
+
+   public interface IGH_Axis
+   {
+      (GH_RuntimeMessageLevel, string) GetAxisDefinition(StringBuilder sb, List<(string, Curve)> addedAxis);
+   }
+
 }
 

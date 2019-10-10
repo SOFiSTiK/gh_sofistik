@@ -11,7 +11,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    namespace Section
    {
@@ -211,13 +211,20 @@ namespace gh_sofistik
 
    public class EvaluateFunction : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public EvaluateFunction()
          : base("Evaluate", "Evaluate", "Evaluates a function", "SOFiSTiK", "Experimental")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofistik_24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "sofistik_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid
@@ -264,13 +271,20 @@ namespace gh_sofistik
 
    public class CrossSectionGenerator : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CrossSectionGenerator()
          : base("Section", "Section", "Defines a SOFiSTiK Cross Section", "SOFiSTiK", "Experimental")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.sofistik_24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "sofistik_24x24.png");
+            return _icon;
+         }
       }
 
       public override Guid ComponentGuid

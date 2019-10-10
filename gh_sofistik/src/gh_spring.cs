@@ -6,7 +6,7 @@ using Rhino.Geometry;
 using Rhino;
 using Rhino.DocObjects;
 
-namespace gh_sofistik.src
+namespace gh_sofistik.Open
 {
    public class GH_Spring : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
    {
@@ -15,6 +15,8 @@ namespace gh_sofistik.src
       public double Axial_stiffness { get; set; } = 0.0;
 
       public double Rotational_stiffness { get; set; } = 0.0;
+
+      public double Transversal_stiffness { get; set; } = 0.0;
 
       public Vector3d Direction { get; set; } = new Vector3d(0,0,1);
 
@@ -97,17 +99,17 @@ namespace gh_sofistik.src
       {
          GH_Spring nc = new GH_Spring();
          nc.Value = new GH_CouplingStruc();
-         if (!(Value.Reference_A is null))
-            nc.Value.Reference_A = Value.Reference_A;
-
-         if (Value.IsACurve)
-            nc.Value.SetA(Value.CurveA.DuplicateCurve());
-         else
-            nc.Value.SetA(new Point(Value.PointA.Location));         
-
+         if (Value.Reference_A != null)
+         {
+            if (Value.IsACurve)
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralLine).DuplicateGeometry() as GS_StructuralLine;
+            else
+               nc.Value.Reference_A = (Value.Reference_A as GS_StructuralPoint).DuplicateGeometry() as GS_StructuralPoint;
+         }
          nc.GroupId = GroupId;
          nc.Axial_stiffness = Axial_stiffness;
          nc.Rotational_stiffness = Rotational_stiffness;
+         nc.Transversal_stiffness = Transversal_stiffness;
          nc.Direction = Direction;
          return nc;
       }
@@ -139,12 +141,14 @@ namespace gh_sofistik.src
 
       public override string ToString()
       {
-         return "Spring" + (GroupId == 0 ? "" : ", Grp Id: " + GroupId) + ", AxStf: " + Axial_stiffness + ", RotStf: " + Rotational_stiffness + (Direction.IsTiny() ? "" : ", Dir: " + Direction);
+         return "Spring" + (GroupId == 0 ? "" : ", Grp Id: " + GroupId) + ", AxStf: " + Axial_stiffness + ", RotStf: " + Rotational_stiffness + ", TransStf: " + Transversal_stiffness + (Direction.IsTiny() ? "" : ", Dir: " + Direction);
       }
    }
 
    public class CreateSpring : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateSpring()
             : base("Spring", "Spring", "Creates SOFiSTiK Point / Line Spring", "SOFiSTiK", "Structure")
       { }
@@ -159,7 +163,12 @@ namespace gh_sofistik.src
       
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_spring_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_spring_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -168,6 +177,7 @@ namespace gh_sofistik.src
          pManager.AddIntegerParameter("Group", "Group", "Group number of this spring", GH_ParamAccess.list, 0);
          pManager.AddNumberParameter("Axial Stiffness", "Ax. Stf.", "Stiffness of this spring in axial direction [kN/m^3]", GH_ParamAccess.list, 0.0);
          pManager.AddNumberParameter("Rotational Stiffness", "Rot. Stf", "Stiffness of this spring in rotational direction [kNm/rad]", GH_ParamAccess.list, 0.0);
+         pManager.AddNumberParameter("Transversal Stiffness", "Tr. Stf", "Stiffness of this spring in transversal direction [kN/m^3]", GH_ParamAccess.list, 0.0);
          pManager.AddVectorParameter("Direction", "Dir", "Explicit Direction of this spring", GH_ParamAccess.list, new Vector3d(0,0,1));
       }
 
@@ -183,7 +193,8 @@ namespace gh_sofistik.src
          List<int> groups = da.GetDataList<int>(1);
          List<double> axial_stiffness = da.GetDataList<double>(2);
          List<double> rotational_stiffness = da.GetDataList<double>(3);
-         List<Vector3d> direction = da.GetDataList<Vector3d>(4);
+         List<double> transversal_stiffness = da.GetDataList<double>(4);
+         List<Vector3d> direction = da.GetDataList<Vector3d>(5);
 
          List<GH_Spring> out_list = new List<GH_Spring>();
          
@@ -196,6 +207,7 @@ namespace gh_sofistik.src
             spr.GroupId = groups.GetItemOrLast(i);
             spr.Axial_stiffness = axial_stiffness.GetItemOrLast(i);
             spr.Rotational_stiffness = rotational_stiffness.GetItemOrLast(i);
+            spr.Transversal_stiffness = transversal_stiffness.GetItemOrLast(i);
             spr.Direction = direction.GetItemOrLast(i);
             
             Enum state = spr.Value.SetInput(a_goo, true);

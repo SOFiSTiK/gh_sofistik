@@ -9,7 +9,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik
+namespace gh_sofistik.Open
 {
    public class GS_StructuralArea : GH_GeometricGoo<Brep>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
    {
@@ -18,7 +18,8 @@ namespace gh_sofistik
       public int MaterialId { get; set; } = 0;
       public int ReinforcementId { get; set; } = 0;
       public double Thickness { get; set; } = 0.0;
-      public Vector3d DirectionLocalX { get; set; } = new Vector3d();      
+      public Vector3d DirectionLocalX { get; set; } = new Vector3d();
+      public bool FlipZ { get; set; } = false;
       public string Alignment { get; set; } = "CENT";
       public string MeshOptions { get; set; } = "AUTO";      
       public double ElementSize { get; set; } = 0.0;
@@ -51,12 +52,13 @@ namespace gh_sofistik
          return new GS_StructuralArea()
          {
             Value = this.Value.DuplicateBrep(),
-            Id = this.Id,
+            Id = 0,
             GroupId = this.GroupId,
             MaterialId = this.MaterialId,
             ReinforcementId = this.ReinforcementId,
             Thickness = this.Thickness,
             DirectionLocalX = this.DirectionLocalX,
+            FlipZ=this.FlipZ,
             Alignment = this.Alignment,
             MeshOptions = this.MeshOptions,
             ElementSize = this.ElementSize,
@@ -168,8 +170,11 @@ namespace gh_sofistik
 
          foreach (BrepFace bf in Value.Faces)
          {
-            int n_seg_u = Math.Max(1, (int)(bf.Domain(0).Length * DrawUtil.DensityFactorLocalFrame));
-            int n_seg_v = Math.Max(1, (int)(bf.Domain(1).Length * DrawUtil.DensityFactorLocalFrame));
+            //int n_seg_u = Math.Max(1, (int)(bf.Domain(0).Length * DrawUtil.DensityFactorLocalFrame));
+            //int n_seg_v = Math.Max(1, (int)(bf.Domain(1).Length * DrawUtil.DensityFactorLocalFrame));
+
+            int n_seg_u = Math.Max(1, (int)(bf.IsoCurve(0, 0).GetLength() * DrawUtil.DensityFactorLocalFrame));
+            int n_seg_v = Math.Max(1, (int)(bf.IsoCurve(1, 0).GetLength() * DrawUtil.DensityFactorLocalFrame));
 
             for (int i = 0; i <= n_seg_v; i++)
             {
@@ -187,12 +192,12 @@ namespace gh_sofistik
 
                   Point3d ap = bf.PointAt(para_u, para_v);
 
-
                   Transform t = TransformUtils.GetGlobalTransformArea(ap, bf, DirectionLocalX);
 
+                  if (FlipZ)
+                     t = t * Rhino.Geometry.Transform.Rotation(Math.PI, Vector3d.XAxis, Point3d.Origin);
+
                   Transform tTranslate = Rhino.Geometry.Transform.Translation(new Vector3d(ap));
-
-
 
                   _localFrame.Transforms.Add(tTranslate * t * tScale);
                }
@@ -200,6 +205,7 @@ namespace gh_sofistik
          }
       }
 
+      /*
       private void updateLocalFrameTransformsOld()
       {
          _localFrame.Transforms.Clear();
@@ -212,6 +218,7 @@ namespace gh_sofistik
             }
          }
       }
+      */
 
       public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)
       {
@@ -257,13 +264,20 @@ namespace gh_sofistik
    // Structural Area node
    public class CreateStructuralArea : GH_Component
    {
+      private System.Drawing.Bitmap _icon;
+
       public CreateStructuralArea()
          : base("Structural Area","Structural Area","Creates SOFiSTiK Structural Areas","SOFiSTiK", "Structure")
       { }
 
       protected override System.Drawing.Bitmap Icon
       {
-         get { return Properties.Resources.structural_area_24x24; }
+         get
+         {
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "structural_area_24x24.png");
+            return _icon;
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -275,6 +289,7 @@ namespace gh_sofistik
          pManager.AddIntegerParameter("Material", "Material", "Material number", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("ReinforcementMaterial", "ReinfMat", "Reinforcement material number", GH_ParamAccess.list, 0);
          pManager.AddVectorParameter("Dir x", "Dir x", "Direction of local x-axis", GH_ParamAccess.list, new Vector3d());
+         pManager.AddBooleanParameter("Flip z", "Flip z", "Flip Direction of local z-axis", GH_ParamAccess.list, false);
          pManager.AddTextParameter("Alignment", "Alignment", "Alignment of the volume in relation to the surface area (Centered = default, Above, Below)", GH_ParamAccess.list, "Centered");
          pManager.AddTextParameter("Mesh Options", "Mesh Options", "Mesh Options for the SOFiSTiK FE meshing (Automatic = default, Regular, Single Quad, Deactivate)", GH_ParamAccess.list, "Automatic");
          pManager.AddNumberParameter("Element Size", "Element Size", "Size of FE elements [m]", GH_ParamAccess.list, 0.0);
@@ -295,10 +310,11 @@ namespace gh_sofistik
          var materials = da.GetDataList<int>(4);
          var matreinfs = da.GetDataList<int>(5);
          var xdirs = da.GetDataList<Vector3d>(6);
-         var alignment = da.GetDataList<string>(7);
-         var meshOptions = da.GetDataList<string>(8);
-         var elementSize = da.GetDataList<double>(9);
-         var userText = da.GetDataList<string>(10);
+         var zflip= da.GetDataList<bool>(7);
+         var alignment = da.GetDataList<string>(8);
+         var meshOptions = da.GetDataList<string>(9);
+         var elementSize = da.GetDataList<double>(10);
+         var userText = da.GetDataList<string>(11);
 
          var gh_structural_areas = new List<GS_StructuralArea>();
 
@@ -317,6 +333,7 @@ namespace gh_sofistik
                   ReinforcementId = matreinfs.GetItemOrLast(i),
                   Thickness = thicknss.GetItemOrLast(i),
                   DirectionLocalX = xdirs.GetItemOrLast(i),
+                  FlipZ = zflip.GetItemOrLast(i),
                   Alignment = parseAlignmentString(alignment.GetItemOrLast(i)),
                   MeshOptions = parseMeshOptionsString(meshOptions.GetItemOrLast(i)),
                   ElementSize = elementSize.GetItemOrLast(i),
