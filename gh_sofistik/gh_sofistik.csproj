@@ -54,6 +54,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\gh_aqua.cs" />
+    <Compile Include="src\gh_section.cs" />
     <Compile Include="src\gh_spring.cs" />
     <Compile Include="src\gh_elastic_coupling.cs" />
     <Compile Include="src\gh_calculate.cs" />
@@ -87,6 +89,9 @@
     <EmbeddedResource Include="src\embedded\images\structural_point_load_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\structural_spring_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\user_options_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\aqua_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\section_brep_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\section_place_24x24.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

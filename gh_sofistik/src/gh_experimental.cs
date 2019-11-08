@@ -214,7 +214,7 @@ namespace gh_sofistik.Open
       private System.Drawing.Bitmap _icon;
 
       public EvaluateFunction()
-         : base("Evaluate", "Evaluate", "Evaluates a function", "SOFiSTiK", "Experimental")
+         : base("obsolete Evaluate", "obsolete Evaluate", "Evaluates a function", "SOFiSTiK", "Experimental")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -274,7 +274,7 @@ namespace gh_sofistik.Open
       private System.Drawing.Bitmap _icon;
 
       public CrossSectionGenerator()
-         : base("Section", "Section", "Defines a SOFiSTiK Cross Section", "SOFiSTiK", "Experimental")
+         : base("obsolete Section", "obsolete Section", "Defines a SOFiSTiK Cross Section", "SOFiSTiK", "Experimental")
       { }
 
       protected override System.Drawing.Bitmap Icon

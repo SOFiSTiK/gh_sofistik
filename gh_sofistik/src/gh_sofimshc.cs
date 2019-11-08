@@ -72,7 +72,6 @@ namespace gh_sofistik.Open
          string text = da.GetData<string>(8);
 
          var structural_elements_pre = new List<IGS_StructuralElement>();
-         var structural_elements = new List<IGS_StructuralElement>();
          List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information = new List<GH_GeometricGoo<GH_CouplingStruc>>();
          var axis_elements = new List<IGH_Axis>();
 
@@ -91,18 +90,24 @@ namespace gh_sofistik.Open
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_StructuralElement.");
          }
 
-         
+         // merge Structural Points at same Location according tolg and adjust references in coupling-like elements to point to new merged structural points
+         var structural_elements_merged = new List<IGS_StructuralElement>();
+         var set_references_back_A = new List<(GH_GeometricGoo<GH_CouplingStruc>, GS_StructuralPoint)>();
+         var set_references_back_B = new List<(GH_GeometricGoo<GH_CouplingStruc>, GS_StructuralPoint)>();
+         mergeStructuralPoints(coupling_information, structural_elements_pre, tolg, structural_elements_merged, set_references_back_A, set_references_back_B);
+
          // setup data for id distribution and pre-processing
+         var structural_elements = new List<IGS_StructuralElement>();
          int id = idBorder;
          SortedSet<int> idSetPoint = new SortedSet<int>();
          SortedSet<int> idSetLine = new SortedSet<int>();
          // assign auto generated IDs temporarily (just for couplings) and write "Id=0" back at end of this method
          List<IGS_StructuralElement> write_id_back_to_zero = new List<IGS_StructuralElement>();
-                  
+
          //id=assignIDs(id, idSet, structural_elements, write_id_back_to_zero);
          id = addUnknownElementsFromCouplings(id, idSetPoint, idSetLine, structural_elements, coupling_information, write_id_back_to_zero);
-         addStructuralElements(idSetPoint, idSetLine, structural_elements, structural_elements_pre);
-         
+         addStructuralElements(idSetPoint, idSetLine, structural_elements, structural_elements_merged);
+
          // build hashmap for couplings: for one id (key), you get a list of couplings in which this structural element is involved
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapPoint = buildCouplingMap(coupling_information, false);
          Dictionary<int, List<GH_GeometricGoo<GH_CouplingStruc>>> couplingMapLine = buildCouplingMap(coupling_information, true);
@@ -320,11 +325,142 @@ namespace gh_sofistik.Open
          foreach (IGS_StructuralElement se in write_id_back_to_zero)
             se.Id = 0;
 
+         foreach (var tp in set_references_back_A)
+            tp.Item1.Value.Reference_A = tp.Item2;
+
+         foreach (var tp in set_references_back_B)
+            tp.Item1.Value.Reference_B = tp.Item2;
+
 
          da.SetData(0, sb.ToString());
       }
 
       #region Id distribution and preprocessing
+
+      private void mergeStructuralPoints(List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information, List<IGS_StructuralElement> structural_elements_pre, double tolg, List<IGS_StructuralElement> structural_elements_merged, List<(GH_GeometricGoo<GH_CouplingStruc>, GS_StructuralPoint)> set_references_back_A, List<(GH_GeometricGoo<GH_CouplingStruc>, GS_StructuralPoint)> set_references_back_B)
+      {
+         // get all spts
+         var spts_noId = new List<GS_StructuralPoint>();
+         var spts_Id = new List<GS_StructuralPoint>();
+         SortedSet<int> idSet = new SortedSet<int>();
+         foreach (var cpl in coupling_information)
+         {
+            if (cpl.Value.Reference_A != null && cpl.Value.Reference_A is GS_StructuralPoint)
+            {
+               var sptA = cpl.Value.Reference_A as GS_StructuralPoint;
+               if (sptA.Id == 0)
+               {
+                  spts_noId.Add(sptA);
+               }
+               else
+               {
+                  if (!idSet.Contains(sptA.Id))
+                  {
+                     idSet.Add(sptA.Id);
+                     spts_Id.Add(sptA);
+                  }
+               }
+            }
+            if (cpl.Value.Reference_B != null && cpl.Value.Reference_B is GS_StructuralPoint)
+            {
+               var sptB = cpl.Value.Reference_B as GS_StructuralPoint;
+               if (sptB.Id == 0)
+               {
+                  spts_noId.Add(sptB);
+               }
+               else
+               {
+                  if (!idSet.Contains(sptB.Id))
+                  {
+                     idSet.Add(sptB.Id);
+                     spts_Id.Add(sptB);
+                  }
+               }
+            }
+         }
+         foreach (var se in structural_elements_pre)
+         {
+            if (se is GS_StructuralPoint)
+            {
+               var spt = se as GS_StructuralPoint;
+               if (spt.Id == 0)
+               {
+                  spts_noId.Add(spt);
+               }
+               else
+               {
+                  if (!idSet.Contains(spt.Id))
+                  {
+                     idSet.Add(spt.Id);
+                     spts_Id.Add(spt);
+                  }
+               }
+            }
+         }
+
+         // merge
+         var mergedSpts = new List<GS_StructuralPoint>();
+         foreach (var spt in spts_noId)
+         {
+            bool merged = false;
+            foreach (var mSpt in mergedSpts)
+            {
+               if (mSpt.Value.Location.DistanceTo(spt.Value.Location) < tolg)
+               {
+                  if (string.IsNullOrEmpty(mSpt.FixLiteral) && !string.IsNullOrEmpty(spt.FixLiteral))
+                     mSpt.FixLiteral = spt.FixLiteral;
+                  mSpt.UserText += "\n" + spt.UserText;
+                  merged = true;
+                  break;
+               }
+            }
+            if (!merged)
+               mergedSpts.Add(spt.DuplicateGeometry() as GS_StructuralPoint);
+         }
+
+         //adjust coupling references to new merged points
+         foreach (var cpl in coupling_information)
+         {
+            if (cpl.Value.Reference_A != null && cpl.Value.Reference_A is GS_StructuralPoint)
+            {
+               var sptA = cpl.Value.Reference_A as GS_StructuralPoint;
+               if (sptA.Id == 0)
+               {
+                  foreach (var mSpt in mergedSpts)
+                  {
+                     if (sptA.Value.Location.DistanceTo(mSpt.Value.Location) < tolg)
+                     {
+                        set_references_back_A.Add((cpl, sptA));
+                        cpl.Value.Reference_A = mSpt;
+                        break;
+                     }
+                  }
+               }
+            }
+            if (cpl.Value.Reference_B != null && cpl.Value.Reference_B is GS_StructuralPoint)
+            {
+               var sptB = cpl.Value.Reference_B as GS_StructuralPoint;
+               if (sptB.Id == 0)
+               {
+                  foreach (var mSpt in mergedSpts)
+                  {
+                     if (sptB.Value.Location.DistanceTo(mSpt.Value.Location) < tolg)
+                     {
+                        set_references_back_B.Add((cpl, sptB));
+                        cpl.Value.Reference_B = mSpt;
+                        break;
+                     }
+                  }
+               }
+            }
+         }
+
+         structural_elements_merged.AddRange(spts_Id);
+         structural_elements_merged.AddRange(mergedSpts);
+         foreach (var se in structural_elements_pre)
+            if (!(se is GS_StructuralPoint))
+               structural_elements_merged.Add(se);
+      }
 
       private List<(string, Curve)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions)
       {
@@ -351,16 +487,23 @@ namespace gh_sofistik.Open
          //check if structural pts at start/end have ids, if not assign ids
          Dictionary<int, (string, string, string)> slnReferences = new Dictionary<int, (string, string, string)>();
          List<GS_StructuralPoint> addAfter = new List<GS_StructuralPoint>();
-         foreach (var se in structural_elements)
-         {
-            if (se is GS_StructuralLine)
-            {
-               var sln = se as GS_StructuralLine;
 
-               //check if sln lies on existing gax               
-               foreach (var ax in addedAxis)
+         //check if sln lies on existing gax
+         foreach (var ax in addedAxis)
+         {
+            var bbMain = ax.Item2.GetBoundingBox(false);
+            bbMain.Max += new Vector3d(0.5, 0.5, 0.5);
+            bbMain.Min -= new Vector3d(0.5, 0.5, 0.5);
+
+            foreach (var se in structural_elements)
+            {
+               if (se is GS_StructuralLine)
                {
-                  if (Util.IsOnCurve(ax.Item2, sln.Value, tolg))
+                  var sln = se as GS_StructuralLine;
+
+                  var bbSln = sln.Value.GetBoundingBox(false);
+
+                  if (bbMain.Contains(bbSln, true) && Util.IsOnCurve(ax.Item2, sln.Value, tolg))
                   {
                      string axRef = ax.Item1;
 
@@ -405,8 +548,6 @@ namespace gh_sofistik.Open
                      }
 
                      slnReferences.Add(sln.Id, (axRef, sptA.Id.ToString(), sptE.Id.ToString()));
-
-                     break;
                   }
                }
             }
@@ -437,7 +578,7 @@ namespace gh_sofistik.Open
             if(se is GS_StructuralPoint)
             {
                if (se.Id == 0 || !idSetPoint.Contains(se.Id))
-                  structural_elements.Add(se);               
+                  structural_elements.Add(se);
             }
             else if (se is GS_StructuralLine)
             {

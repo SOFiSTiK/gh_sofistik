@@ -177,13 +177,52 @@ namespace gh_sofistik
 
       public static bool IsOnCurve(Curve mainCrv, Curve subCrv, double tolerance)
       {
-         if (mainCrv.GetBoundingBox(false).Contains(subCrv.GetBoundingBox(false), false))
-            if (mainCrv.ClosestPoint(subCrv.PointAtStart, out var tA, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtNormalizedLength(0.5), out var tM, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtEnd, out var tE, tolerance))
-               if ((mainCrv.TangentAt(tA) - subCrv.TangentAtStart).IsTiny(tolerance) && (mainCrv.TangentAt(tE) - subCrv.TangentAtEnd).IsTiny(tolerance))
-                  return true;
+         if (mainCrv.ClosestPoint(subCrv.PointAtStart, out var tA, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtNormalizedLength(0.47), out var tM, tolerance) && mainCrv.ClosestPoint(subCrv.PointAtEnd, out var tE, tolerance))
+            return true;
          return false;
       }
 
+      /// <summary>
+      /// for a input string the numerical suffix is count up. e.g input: P101 output: P102
+      /// </summary>
+      /// <param name="s"></param>
+      /// <returns>input string with numerical suffix count up by 1</returns>
+      public static string CountStringUp(string s)
+      {
+         int i = s.Length - 1;
+         while (i >= 0)
+         {
+            if (!int.TryParse(s.Substring(i, 1), out var v))
+               break;
+            i--;
+         }
+         int lastNumber = 0;
+         if (i != s.Length - 1)
+            int.TryParse(s.Substring(i + 1), out lastNumber);
+
+         lastNumber++;
+
+         string res = s.Substring(0, i + 1) + lastNumber;
+
+         return res;
+      }
+
+      public static Polyline CreatePolyLine(Curve crv)
+      {
+         Polyline polyLine = null;
+         if (crv.IsPolyline() && crv.TryGetPolyline(out polyLine))
+         {
+
+         }
+         else
+         {
+            var polyLineCurve = crv.ToPolyline(Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance, Rhino.RhinoDoc.ActiveDoc.ModelAngleToleranceRadians, crv.GetLength() / 100, crv.GetLength());
+            polyLine = polyLineCurve.ToPolyline();
+         }
+         return polyLine;
+      }
+
+      public static Plane SofiSectionBasePlane { get; } = new Plane(Point3d.Origin, Vector3d.XAxis, -1 * Vector3d.YAxis);
    }
 
    static class DrawUtil
@@ -1157,7 +1196,7 @@ namespace gh_sofistik
 
             crv = Curve.CreateInterpolatedCurve(points, 3);
 
-            crv.Translate(new Vector3d(0,0,-1));
+            // crv.Translate(new Vector3d(0,0,-1));
 
 
             crv.Scale(prescale * DrawUtil.ScaleFactorSupports);

@@ -90,7 +90,7 @@ namespace gh_sofistik.Open
       {         
          _cplCond = new CouplingCondition();
          List<string> sl = new List<string>();
-         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness);
+         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
 
          _cplCond.CreateSpringSymbols(Value.GetSingleInputPoints(), sl, Direction);
       }
