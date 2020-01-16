@@ -93,6 +93,9 @@
     <EmbeddedResource Include="src\embedded\images\section_brep_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\section_place_24x24.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\queenbee\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>copy "$(TargetPath)" "$(TargetDir)$(ProjectName).gha"
