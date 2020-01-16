@@ -93,8 +93,9 @@
     <EmbeddedResource Include="src\embedded\images\section_brep_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\section_place_24x24.png" />
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
-    <Folder Include="src\queenbee\" />
+    <Content Include="src\queenbee\queenbee.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
