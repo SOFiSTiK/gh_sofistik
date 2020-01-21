@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
@@ -9,7 +7,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    public class GS_StructuralArea : GH_GeometricGoo<Brep>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
    {
@@ -21,11 +19,12 @@ namespace gh_sofistik.Open
       public Vector3d DirectionLocalX { get; set; } = new Vector3d();
       public bool FlipZ { get; set; } = false;
       public string Alignment { get; set; } = "CENT";
-      public string MeshOptions { get; set; } = "AUTO";      
+      public string MeshOptions { get; set; } = "AUTO";
       public double ElementSize { get; set; } = 0.0;
       public string UserText { get; set; } = string.Empty;
 
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+      private Point3d _drawGroupIdLocation = Point3d.Unset;
 
       public override BoundingBox Boundingbox
       {
@@ -119,10 +118,14 @@ namespace gh_sofistik.Open
          if (Value != null)
          {  
             System.Drawing.Color col = args.Color;
-            if(!DrawUtil.CheckSelection(col))
+            if (!DrawUtil.CheckSelection(col))
                col = DrawUtil.DrawColorStructuralElements;
             else
+            {
                drawLocalFrame(args.Pipeline);
+               if (DrawUtil.DrawInfo && GroupId > 0)
+                  drawGroupId(args);
+            }
 
             args.Pipeline.DrawBrepWires(Value, col, -1);
          }
@@ -150,6 +153,26 @@ namespace gh_sofistik.Open
          }
       }
 
+      private void drawGroupId(GH_PreviewWireArgs args)
+      {
+         if (Value.Vertices.Count > 0) {
+            double midOffset = 20;
+
+            if (_drawGroupIdLocation == Point3d.Unset)
+            {
+               var midPoint3d = Point3d.Origin;
+               foreach (var vertex in Value.Vertices)
+                  midPoint3d += vertex.Location;
+               midPoint3d /= Value.Vertices.Count;
+               _drawGroupIdLocation = Value.ClosestPoint(midPoint3d);
+            }
+
+            var midPoint2d = args.Viewport.WorldToClient(_drawGroupIdLocation);
+            midPoint2d.X -= midOffset;
+            args.Pipeline.DrawDot((float)midPoint2d.X, (float)midPoint2d.Y, "Grp: " + GroupId, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+         }
+      }
+
       private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
       {
          if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
@@ -170,9 +193,6 @@ namespace gh_sofistik.Open
 
          foreach (BrepFace bf in Value.Faces)
          {
-            //int n_seg_u = Math.Max(1, (int)(bf.Domain(0).Length * DrawUtil.DensityFactorLocalFrame));
-            //int n_seg_v = Math.Max(1, (int)(bf.Domain(1).Length * DrawUtil.DensityFactorLocalFrame));
-
             int n_seg_u = Math.Max(1, (int)(bf.IsoCurve(0, 0).GetLength() * DrawUtil.DensityFactorLocalFrame));
             int n_seg_v = Math.Max(1, (int)(bf.IsoCurve(1, 0).GetLength() * DrawUtil.DensityFactorLocalFrame));
 
@@ -204,21 +224,6 @@ namespace gh_sofistik.Open
             }
          }
       }
-
-      /*
-      private void updateLocalFrameTransformsOld()
-      {
-         _localFrame.Transforms.Clear();
-         
-         foreach (BrepFace bf in Value.Faces)
-         {
-            foreach (int beIndex in bf.AdjacentEdges())
-            {
-               _localFrame.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value.Edges[beIndex], true, DirectionLocalX, bf, DrawUtil.ScaleFactorLocalFrame, DrawUtil.DensityFactorLocalFrame));
-            }
-         }
-      }
-      */
 
       public bool BakeGeometry(RhinoDoc doc, ObjectAttributes baking_attributes, out Guid obj_guid)
       {

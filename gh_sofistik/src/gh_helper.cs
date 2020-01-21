@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
@@ -165,6 +162,7 @@ namespace gh_sofistik
             if (assembly.ManifestModule.Name == "gh_sofistik.gha")
                path = gitAssemblyPath;
             var stream = assembly.GetManifestResourceStream(path + "embedded.images." + name);
+
             if (stream == null)
                return null;
             return new System.Drawing.Bitmap(System.Drawing.Image.FromStream(stream));
@@ -225,73 +223,88 @@ namespace gh_sofistik
       public static Plane SofiSectionBasePlane { get; } = new Plane(Point3d.Origin, Vector3d.XAxis, -1 * Vector3d.YAxis);
    }
 
-   static class DrawUtil
+   public static class DrawUtil
    {
-      private static double scaleFactorLoads = 1.0;
+      private static double _scaleFactorLoads = 1.0;
       public static double ScaleFactorLoads
       {
-         get { return scaleFactorLoads; }
+         get { return _scaleFactorLoads; }
          set
          {
-            scaleFactorLoads = value < 0 ? 0 : value;
+            _scaleFactorLoads = value < 0.0 ? 0.0 : value;
          }
       }
 
-      private static double densityFactorLoads = 1.0;
+      private static double _densityFactorLoads = 1.0;
       public static double DensityFactorLoads
       {
-         get { return densityFactorLoads; }
+         get { return _densityFactorLoads; }
          set
          {
-            densityFactorLoads = value < 0 ? 0 : value;
+            _densityFactorLoads = value < 0.0 ? 0.0 : value;
          }
       }
 
-      private static double scaleFactorSupports = 1.0;
+      private static double _scaleFactorSupports = 1.0;
       public static double ScaleFactorSupports
       {
-         get { return scaleFactorSupports; }
+         get { return _scaleFactorSupports; }
          set
          {
-            scaleFactorSupports = value < 0 ? 0 : value;
+            _scaleFactorSupports = value < 0.0 ? 0.0 : value;
          }
       }
 
-      private static double densityFactorSupports = 1.0;
+      private static double _densityFactorSupports = 1.0;
       public static double DensityFactorSupports
       {
-         get { return densityFactorSupports; }
+         get { return _densityFactorSupports; }
          set
          {
-            densityFactorSupports = value < 0 ? 0 : value;
+            _densityFactorSupports = value < 0.0 ? 0.0 : value;
          }
       }
 
-      private static double scaleFactorLocalFrame = 1.0;
+      private static double _scaleFactorLocalFrame = 1.0;
       public static double ScaleFactorLocalFrame
       {
-         get { return scaleFactorLocalFrame; }
+         get { return _scaleFactorLocalFrame; }
          set
          {
-            scaleFactorLocalFrame = value < 0 ? 0 : value;
+            _scaleFactorLocalFrame = value < 0.0 ? 0.0 : value;
          }
       }
 
-      private static double densityFactorLocalFrame = 0.0;
+      private static double _densityFactorLocalFrame = 0.0;
       public static double DensityFactorLocalFrame
       {
-         get { return densityFactorLocalFrame; }
+         get { return _densityFactorLocalFrame; }
          set
          {
-            densityFactorLocalFrame = value < 0 ? 0 : value;
+            _densityFactorLocalFrame = value < 0.0 ? 0.0 : value;
          }
       }
+
+      private static double _scaleFactorMisc = 1.0;
+      public static double ScaleFactorMisc
+      {
+         get { return _scaleFactorMisc; }
+         set
+         {
+            _scaleFactorMisc = value < 0.0 ? 0.0 : value;
+         }
+      }
+
+      public static bool DrawInfo { get; set; } = false;
 
       public static System.Drawing.Color DrawColorStructuralElements { get; set; } = System.Drawing.Color.Red;
 
       public static System.Drawing.Color DrawColorLoads { get; set; } = System.Drawing.Color.Red;
 
       public static System.Drawing.Color DrawColorSupports { get; set; } = System.Drawing.Color.Red;
+
+      public static System.Drawing.Color DrawColorInfoDotBack { get; set; } = System.Drawing.Color.LimeGreen;
+      public static System.Drawing.Color DrawColorInfoDotText { get; set; } = System.Drawing.Color.Black;
 
       public static bool CheckSelection(System.Drawing.Color c)
       {
@@ -363,6 +376,18 @@ namespace gh_sofistik
          }
 
          return res;
+      }
+
+      public static string ShortenFixString(string s)
+      {
+         var upperString = s.ToUpper();
+         if (upperString.Contains("PXPYPZ"))
+            upperString = upperString.Replace("PXPYPZ", "PP");
+         if (upperString.Contains("MXMYMZ"))
+            upperString = upperString.Replace("MXMYMZ", "MM");
+         if (upperString.Contains("PPMM"))
+            upperString = upperString.Replace("PPMM", "F");
+         return upperString;
       }
 
       public static string ReconstructFixString(string s)
@@ -1257,7 +1282,7 @@ namespace gh_sofistik
       {
          _symbols = new List<ISymbol>();
          _density = DrawUtil.DensityFactorSupports;
-         _scale = DrawUtil.ScaleFactorSupports;         
+         _scale = DrawUtil.ScaleFactorSupports;
       }
 
       public void CreateCouplingSymbols(List<Line> lines, List<string> info)
@@ -1314,20 +1339,23 @@ namespace gh_sofistik
 
       public void DrawInfo(GH_PreviewWireArgs args)
       {
-         //pipeline.Draw2dText(s, System.Drawing.Color.Black, _mid, true);
-         Point2d mid_2d = args.Viewport.WorldToClient(_mid_points[0]);
-         for (int j = 1; j < _mid_points.Length; j++)
+         if (DrawUtil.DrawInfo)
          {
-            Point2d p2d = args.Viewport.WorldToClient(_mid_points[j]);
-            if (p2d.X < mid_2d.X)
-               mid_2d = p2d;
-         }
+            //pipeline.Draw2dText(s, System.Drawing.Color.Black, _mid, true);
+            Point2d mid_2d = args.Viewport.WorldToClient(_mid_points[0]);
+            for (int j = 1; j < _mid_points.Length; j++)
+            {
+               Point2d p2d = args.Viewport.WorldToClient(_mid_points[j]);
+               if (p2d.X < mid_2d.X)
+                  mid_2d = p2d;
+            }
 
-         int i = 0;
-         foreach (string s in _sList)
-         {
-            args.Pipeline.DrawDot((float)mid_2d.X - 50, (float)(mid_2d.Y + (i - (_sList.Count - 1) / 2) * 20), s, System.Drawing.Color.Green, System.Drawing.Color.Black);
-            i++;
+            int i = 0;
+            foreach (string s in _sList)
+            {
+               args.Pipeline.DrawDot((float)mid_2d.X - 50, (float)(mid_2d.Y + (i - (_sList.Count - 1) / 2) * 20), s, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+               i++;
+            }
          }
       }
    }
@@ -1343,7 +1371,7 @@ namespace gh_sofistik
       public bool isValid
       {
          get
-         {            
+         {
             _valid = true;
             if (Math.Abs(_scale - DrawUtil.ScaleFactorLocalFrame) > 0.0001)
             {
@@ -1397,7 +1425,7 @@ namespace gh_sofistik
 
             pipeline.DrawArrow(xLine, System.Drawing.Color.Red, 0.0, 0.382);
             pipeline.DrawArrow(yLine, System.Drawing.Color.Green, 0.0, 0.382);
-            pipeline.DrawArrow(zLine, System.Drawing.Color.Blue, 0.0, 0.382);            
+            pipeline.DrawArrow(zLine, System.Drawing.Color.Blue, 0.0, 0.382);
          }
       }
    }

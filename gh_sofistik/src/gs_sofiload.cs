@@ -7,8 +7,70 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Load
 {
+   public class LoadCase
+   {
+      public int Id { get; set; } = 0;
+      public string Type { get; set; } = string.Empty;
+      public double Facd { get; set; } = 0.0;
+      public string Title { get; set; } = string.Empty;
+      public LoadCase()
+      {
+         this.Id = 0;
+         this.Facd = 0.0;
+         this.Type = string.Empty;
+         this.Title = string.Empty;
+      }
+      // Copy Constructor
+      public LoadCase(LoadCase LoadCaseSource)
+      {
+         this.Id = LoadCaseSource.Id;
+         this.Facd = LoadCaseSource.Facd;
+         this.Type = LoadCaseSource.Type;
+         this.Title = LoadCaseSource.Title;
+      }
+      public string ToCadinp()
+      {
+         var sb = new StringBuilder();
+         sb.Clear();
+         sb.AppendFormat("LC {0} TYPE {1}", Id, Type);
+         if (Math.Abs(Facd) > 0.0)
+            sb.AppendFormat(" FACD {0:F3}", Facd);
+         if (string.IsNullOrEmpty(Title) == false)
+            sb.AppendFormat(" TITL {0}", Title);
+
+         return sb.ToString();
+      }
+   }
+   public class GS_LoadCase : GH_Goo<LoadCase> //, IGS_LoadCase
+   {
+      public override string ToString()
+      {
+         return Value.ToCadinp();
+      }
+
+      // GS_LoadCase instances are always valid
+      public override bool IsValid
+      {
+         get { return Value != null; }
+      }
+
+      public override string TypeName
+      {
+         get { return "GS_LoadCase"; }
+      }
+
+      public override string TypeDescription
+      {
+         get { return "Basic LoadCase information (Id, Type, Title, Facd)"; }
+      }
+
+      public override IGH_Goo Duplicate()
+      {
+         return new GS_LoadCase() { Value = new LoadCase(Value) };
+      }
+   }
 
    public class CreateLoadCase : GH_Component
    {
@@ -43,7 +105,7 @@ namespace gh_sofistik.Open
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("Lc", "Lc", "SOFiLOAD Input", GH_ParamAccess.list);
+         pManager.AddGenericParameter("LoadCase", "Lc", "SOFiSTiK LoadCase Definition", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -53,29 +115,38 @@ namespace gh_sofistik.Open
          var facds = da.GetDataList<double>(2);
          var titls = da.GetDataList<string>(3);
 
-         var load_cases = new List<string>();
-
-         var sb = new StringBuilder();
+         var load_cases = new List<GS_LoadCase>();
 
          for( int i=0; i<ids.Count; ++i)
          {
-            sb.Clear();
-
             var id = ids[i];
             var type = types.GetItemOrLast(i);
             var facd = facds.GetItemOrLast(i);
             var titl = titls.GetItemOrLast(i);
 
-            if (type == string.Empty) type = "NONE";
+            if (string.IsNullOrEmpty(type))
+               type = "NONE";
 
-            sb.AppendFormat("LC {0} TYPE {1}", id, type);
-            if (Math.Abs(facd) > 1.0E-6)
-               sb.AppendFormat(" FACD {0:F3}", facd);
-            if (string.IsNullOrEmpty(titl) == false)
-               sb.AppendFormat(" TITL {0}", titl);
-            sb.AppendLine();
+            if (Math.Abs(facd) < 1.0E-6)
+               facd = 0.0;
 
-            load_cases.Add(sb.ToString());
+            if (id <= 0)
+               continue;
+
+            var lc = new LoadCase()
+            {
+               Id = id,
+               Type = type,
+               Facd = facd,
+               Title = titl
+            };
+
+            var gsLc = new GS_LoadCase()
+            {
+               Value = lc,
+            };
+
+            load_cases.Add(gsLc);
          }
 
          da.SetDataList(0, load_cases);
@@ -108,8 +179,10 @@ namespace gh_sofistik.Open
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddGeometryParameter("Ld", "Ld", "Collection of SOFiSTiK Load Items", GH_ParamAccess.list);
-         pManager.AddTextParameter("Lc", "Lc", "Load Case Definition (in SOFiLOAD Syntax)", GH_ParamAccess.list, string.Empty);
+         pManager.AddGenericParameter("LoadCase", "Lc", "SOFiSTiK LoadCase Definition", GH_ParamAccess.list);
          pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of loads", GH_ParamAccess.item, string.Empty);
+
+         pManager[1].Optional = true;
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -119,9 +192,13 @@ namespace gh_sofistik.Open
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
+         var ldList = da.GetDataList<IGH_Goo>(0);
+         var lcList = da.GetDataList<GS_LoadCase>(1);
+         string text = da.GetData<string>(2);
+
          // get load case definitions
          var all_loads = new List<IGS_Load>();
-         foreach( var it in da.GetDataList<IGH_Goo>(0))
+         foreach( var it in ldList)
          {
             if (it is IGS_Load)
                all_loads.Add(it as IGS_Load);
@@ -131,17 +208,17 @@ namespace gh_sofistik.Open
 
          // extract load case headers
          var load_cases = new Dictionary<int, string>();
-         foreach( var ilc in da.GetDataList<string>(1))
+         foreach (var ilc in lcList)
          {
-            int id = 0;
-            var slc = ilc.Split(null,3);
-            if(slc.Length>2 && int.TryParse(slc[1],out id))
+            if (ilc.Value.Id != 0)
             {
-               load_cases.Add(id, ilc);
+               load_cases.Add(ilc.Value.Id, ilc.Value.ToCadinp().Trim());
             }
          }
 
-         string text = da.GetData<string>(2);
+         // calc unit conversion factor and scale-transform
+         var tU = Units.UnitHelper.GetUnitTransformToMeters();
+         bool scaleUnit = Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem != Rhino.UnitSystem.Meters;
 
          var sb = new StringBuilder();
 
@@ -157,10 +234,9 @@ namespace gh_sofistik.Open
             if (lc_loads.Count() == 0)
                continue;
 
-            string lc_definition = string.Empty;
-            if(load_cases.TryGetValue(lc_loads.Key,out lc_definition))
+            if(load_cases.TryGetValue(lc_loads.Key,out var lc_definition))
             {
-               sb.AppendLine(lc_definition.Trim());
+               sb.AppendLine(lc_definition);
                load_cases.Remove(lc_loads.Key);
             }
             else
@@ -180,13 +256,17 @@ namespace gh_sofistik.Open
                   string no_string = (!(pl.ReferencePoint is null)) && pl.ReferencePoint.Id > 0 ? pl.ReferencePoint.Id.ToString() : "-";
                   int type_off = pl.UseHostLocal ? 3 : 0;
 
+                  var plGeo = pl.Value.Duplicate() as Point;
+                  if (scaleUnit)
+                     plGeo.Transform(tU);
+
                   for (int i = 0; i < 3; ++i)
                   {
                      if (Math.Abs(pl.Forces[i]) > 1.0E-6)
                      {
                         sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
-                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[0, i + type_off], pl.Forces[i]);
-                        AppendLoadGeometry(sb, pl.Value);
+                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[0, i + type_off], pl.Forces[i]);                        
+                        AppendLoadGeometry(sb, plGeo);
                         sb.AppendLine();
                      }
                   }
@@ -197,7 +277,7 @@ namespace gh_sofistik.Open
                      {
                         sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
                         sb.AppendFormat(" TYPE {0} {1:F6}", load_types[1, i + type_off], pl.Moments[i]);
-                        AppendLoadGeometry(sb, pl.Value);
+                        AppendLoadGeometry(sb, plGeo);
                         sb.AppendLine();
                      }
                   }
@@ -213,7 +293,14 @@ namespace gh_sofistik.Open
                   string no_string = hosted ? ll.ReferenceLine.Id.ToString() : "-";
                   int type_off = ll.UseHostLocal ? 3 : 0;
 
-                  var points = hosted ? new List<Point3d>() : GetCurvePolygon(ll.Value);
+                  var points = new List<Point3d>();
+                  if (!hosted)
+                  {
+                     var crvGeo = ll.Value.DuplicateCurve();
+                     if (scaleUnit)
+                        crvGeo.Transform(tU);
+                     points = GetCurvePolygon(crvGeo);
+                  }
 
                   for (int i=0; i < 3; ++i)
                   {
@@ -248,7 +335,11 @@ namespace gh_sofistik.Open
                   string no_string = hosted ? al.ReferenceArea.Id.ToString() : "-";
                   int type_off = al.UseHostLocal ? 3 : 0;
 
-                  foreach( var fc in al.Value.Faces )
+                  var brpGeo = al.Value.DuplicateBrep();
+                  if (scaleUnit)
+                     brpGeo.Transform(tU);
+
+                  foreach( var fc in brpGeo.Faces )
                   {
                      // checks and preparations
                      fc.ShrinkFace(BrepFace.ShrinkDisableSide.ShrinkAllSides);

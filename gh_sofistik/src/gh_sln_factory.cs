@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
@@ -9,7 +7,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    // class implementing a GH_ container for Rhino.Geometry.Curve
    public class GS_StructuralLine : GH_GeometricGoo<Curve>, IGH_PreviewData, IGH_BakeAwareData, IGS_StructuralElement
@@ -41,7 +39,7 @@ namespace gh_sofistik.Open
 
       private SupportCondition _supp_condition = null;
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
-
+      private Point3d _drawGroupIdLocation = Point3d.Unset;
 
       public override BoundingBox Boundingbox
       {
@@ -131,11 +129,15 @@ namespace gh_sofistik.Open
                colSup = System.Drawing.Color.Black;
             }
             else
+            {
                drawLocalFrame(args.Pipeline);
+               if (DrawUtil.DrawInfo && GroupId > 0)
+                  drawGroupId(args);
+            }
 
             args.Pipeline.DrawCurve(Value, colStr, args.Thickness+1);
 
-            drawSupportLine(args.Pipeline, colSup, false);            
+            drawSupportLine(args.Pipeline, colSup, false);
          }
       }
 
@@ -146,6 +148,17 @@ namespace gh_sofistik.Open
          {
             drawSupportLine(args.Pipeline, DrawUtil.DrawColorSupports, true);
          }
+      }
+
+      private void drawGroupId(GH_PreviewWireArgs args)
+      {
+         double midOffset = 20;
+
+         if (_drawGroupIdLocation == Point3d.Unset)
+            _drawGroupIdLocation = Value.PointAtNormalizedLength(0.5);
+         var midPoint2d = args.Viewport.WorldToClient(_drawGroupIdLocation);
+         midPoint2d.X -= midOffset;
+         args.Pipeline.DrawDot((float)midPoint2d.X, (float)midPoint2d.Y, "Grp: " + GroupId, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
       }
 
       private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
@@ -327,7 +340,7 @@ namespace gh_sofistik.Open
                   FixLiteral = fixations.GetItemOrLast(i),
                   ElementType = parseElementTypeString(elementType.GetItemOrLast(i)),
                   ElementSize = elementSize.GetItemOrLast(i),
-                  UserText = userText.GetItemOrLast(i)
+                  UserText = userText.GetItemOrLast(i),
                };
                gh_structural_curves.Add(gc);
             }

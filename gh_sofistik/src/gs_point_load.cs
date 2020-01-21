@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
-using Rhino;
-using Rhino.DocObjects;
 using Rhino.Geometry;
+using gh_sofistik.Structure;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Load
 {
    public interface IGS_Load
    {

@@ -1,13 +1,9 @@
 using Grasshopper.Kernel;
-using Grasshopper.Kernel.Data;
-using Grasshopper.Kernel.Types;
-using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
-namespace gh_sofistik.Open.Section
+namespace gh_sofistik.Section
 {
    public class CreateAquaInput : GH_Component
    {
@@ -35,6 +31,7 @@ namespace gh_sofistik.Open.Section
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
          pManager.AddGenericParameter("Section", "Sec", "SOFiSTiK Cross Section", GH_ParamAccess.list);
+         pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional AQUA control values", GH_ParamAccess.item, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -46,6 +43,8 @@ namespace gh_sofistik.Open.Section
       {
          var sections = new Dictionary<int, GH_Section>();
 
+         string ctrl = da.GetData<string>(1);
+
          foreach (var it in da.GetDataList<GH_Section>(0))
          {
             if (it != null && !sections.ContainsKey(it.Value.Id))
@@ -55,10 +54,15 @@ namespace gh_sofistik.Open.Section
          StringBuilder sb = new StringBuilder();
          sb.AppendLine("+PROG AQUA");
          sb.AppendLine("HEAD");
-         sb.AppendLine("NORM DIN EN1994-2004");
          sb.AppendLine("PAGE UNII 0");
-         sb.AppendLine("CONC 1 C 25 ; STEE 2 B 500B");
+
+         if (!string.IsNullOrEmpty(ctrl))
+            sb.AppendLine(ctrl);
+         else
+            sb.AppendLine("CTRL REST 1");
+
          sb.AppendLine();
+
          foreach (var kvp in sections)
          {
             var res = kvp.Value.Value.GetSectionDefinition(sb);

@@ -1,16 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 using Grasshopper.Kernel;
-using Grasshopper.Kernel.Types;
-using Rhino;
-using Rhino.DocObjects;
 using Rhino.Geometry;
 
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Geometry
 {
    // creates SOFiSTiK axis input from a curve definition in GH
    public class CreateGeometricAxis : GH_Component
@@ -18,7 +14,7 @@ namespace gh_sofistik.Open
       private System.Drawing.Bitmap _icon;
 
       public CreateGeometricAxis()
-         : base("Geometric Axis","Geom Axis", "Creates a SOFiSTiK geometry axis definition from a curve","SOFiSTiK","Geometry")
+         : base("Geometric Axis","Geom Axis", "Creates a SOFiSTiK geometry axis definition from a curve","SOFiSTiK", "General")
       {}
 
       protected override System.Drawing.Bitmap Icon
@@ -128,11 +124,11 @@ namespace gh_sofistik.Open
 
       private static void AppendLineDefinition(StringBuilder sb, Curve c)
       {
-         Point3d pa = c.PointAt(0);
-         Point3d pe = c.PointAt(1);
+         Point3d pa = c.PointAtStart;
+         Point3d pe = c.PointAtEnd;
 
-         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} ", pa.X, pa.Y, pa.Z);
-         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} ", pe.X, pe.Y, pe.Z);
+         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, c.Domain.T0);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, c.Domain.T1);
          sb.AppendLine();
       }
 
@@ -143,8 +139,8 @@ namespace gh_sofistik.Open
          Point3d pm = ar.Arc.Center;
          Vector3d n = ar.Arc.Plane.Normal;
 
-         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} ", pa.X, pa.Y, pa.Z);
-         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} ", pe.X, pe.Y, pe.Z);
+         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, ar.Domain.T0);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, ar.Domain.T1);
          sb.AppendFormat(" XM {0:F8} {1:F8} {2:F8} ", pm.X, pm.Y, pm.Z);
          sb.AppendFormat(" NX {0:F8} {1:F8} {2:F8} ", n.X, n.Y, n.Z);
          sb.AppendLine();

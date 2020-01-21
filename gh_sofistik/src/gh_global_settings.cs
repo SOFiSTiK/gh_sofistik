@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using Grasshopper.Kernel;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.General
 {
    public class CreateGlobalSettings : GH_Component
    {
@@ -39,8 +38,10 @@ namespace gh_sofistik.Open
          pManager.AddNumberParameter("Density Factor Loads", "Density Factor Loads", "Global Density for Line/Area Loads", GH_ParamAccess.item, DrawUtil.DensityFactorLoads);
          pManager.AddNumberParameter("Scale Factor Supports", "Scale Factor Supports", "Global Scale Factor for displayed SOFiSTiK Support Symbols", GH_ParamAccess.item, DrawUtil.ScaleFactorSupports);
          pManager.AddNumberParameter("Density Factor Supports", "Density Factor Supports", "Global Density for Line Supports", GH_ParamAccess.item, DrawUtil.DensityFactorSupports);
-         pManager.AddNumberParameter("Scale Factor LocalFrame", "Scale Factor for local Frame", "Global Scale Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.ScaleFactorLocalFrame);
-         pManager.AddNumberParameter("Density Factor LocalFrame", "Density Factor for local Frame", "Global Density Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.DensityFactorLocalFrame);
+         pManager.AddNumberParameter("Scale Factor LocalFrame", "Scale Factor LocalFrame", "Global Scale Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.ScaleFactorLocalFrame);
+         pManager.AddNumberParameter("Density Factor LocalFrame", "Density Factor LocalFrame", "Global Density Factor for displayed local coordinate frames", GH_ParamAccess.item, DrawUtil.DensityFactorLocalFrame);
+         pManager.AddNumberParameter("Scale miscellaneous Elements", "Scale miscellaneous Elements", "Global Scale Factor for miscellaneous Elements", GH_ParamAccess.item, DrawUtil.ScaleFactorMisc);
+         pManager.AddBooleanParameter("Show Info", "Show Info", "Show/Hide additional Information of Structural Elements when selected", GH_ParamAccess.item, DrawUtil.DrawInfo);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -59,7 +60,8 @@ namespace gh_sofistik.Open
          DrawUtil.DensityFactorSupports = DA.GetData<double>(6);
          DrawUtil.ScaleFactorLocalFrame = DA.GetData<double>(7);
          DrawUtil.DensityFactorLocalFrame = DA.GetData<double>(8);
-
+         DrawUtil.ScaleFactorMisc = DA.GetData<double>(9);
+         DrawUtil.DrawInfo = DA.GetData<bool>(10);
       }
    }
 }

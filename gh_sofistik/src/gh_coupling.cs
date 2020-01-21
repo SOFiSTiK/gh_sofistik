@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
-using Rhino;
-using Rhino.DocObjects;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    public class GH_CouplingStruc
    {
@@ -274,25 +272,16 @@ namespace gh_sofistik.Open
             _cplCond.DrawInfo(args);
 
          _cplCond.Draw(args.Pipeline, col);
-
-         /*
-         if(Value.IsACurve)
-            args.Pipeline.DrawCurve(Value.CurveA, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointA.Location, Rhino.Display.PointStyle.X, 5, col);
-         if (Value.IsBCurve)
-            args.Pipeline.DrawCurve(Value.CurveB, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointB.Location, Rhino.Display.PointStyle.X, 5, col);
-         */
       }
 
       private void updateCouplings()
       {
          _cplCond = new CouplingCondition();
          List<string> sl = new List<string>();
-         if (!FixLiteral.Equals(""))
-            sl.Add(FixLiteral);
+         if (!string.IsNullOrWhiteSpace(FixLiteral))
+            sl.Add("Fix: " + DrawUtil.ShortenFixString(FixLiteral));
+         if (GroupId > 0)
+            sl.Add("Grp: " + GroupId);
 
          _cplCond.CreateDottedLineSymbols(Value.GetConnectionLines(), sl);
       }
@@ -400,7 +389,6 @@ namespace gh_sofistik.Open
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
-
          List<IGH_GeometricGoo> a_list = da.GetDataList<IGH_GeometricGoo>(0);
          List<IGH_GeometricGoo> b_list = da.GetDataList<IGH_GeometricGoo>(1);
          List<int> groups = da.GetDataList<int>(2);
@@ -408,12 +396,12 @@ namespace gh_sofistik.Open
 
          List<GH_Coupling> out_list = new List<GH_Coupling>();
 
-         int count = Math.Min(a_list.Count, b_list.Count);
+         int count = Math.Max(a_list.Count, b_list.Count);
 
          for (int i = 0; i < count; i++)
          {
-            IGH_GeometricGoo a_goo = a_list[i];
-            IGH_GeometricGoo b_goo = b_list[i];
+            IGH_GeometricGoo a_goo = a_list.GetItemOrLast(i);
+            IGH_GeometricGoo b_goo = b_list.GetItemOrLast(i);
 
             GH_Coupling cpl = new GH_Coupling();
             cpl.Value = new GH_CouplingStruc();

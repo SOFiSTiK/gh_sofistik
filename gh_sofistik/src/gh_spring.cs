@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
-using Rhino;
-using Rhino.DocObjects;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    public class GH_Spring : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
    {
@@ -87,10 +85,12 @@ namespace gh_sofistik.Open
       }
 
       private void updateSpring()
-      {         
+      {
          _cplCond = new CouplingCondition();
          List<string> sl = new List<string>();
          sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
+         if (GroupId > 0)
+            sl.Add("Grp: " + GroupId);
 
          _cplCond.CreateSpringSymbols(Value.GetSingleInputPoints(), sl, Direction);
       }
@@ -135,7 +135,7 @@ namespace gh_sofistik.Open
          if (nc.Value.IsACurve)
             xmorph.Morph(nc.Value.CurveA);
          else
-            xmorph.Morph(nc.Value.PointA);         
+            xmorph.Morph(nc.Value.PointA);
          return nc;
       }
 

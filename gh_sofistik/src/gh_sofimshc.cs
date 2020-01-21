@@ -6,7 +6,7 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    public class CreateSofimshcInput : GH_Component
    {
@@ -90,6 +90,11 @@ namespace gh_sofistik.Open
                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to IGS_StructuralElement.");
          }
 
+         // calc unit conversion factor and scale-transform
+         var unitFactor = Rhino.RhinoMath.UnitScale(Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem, Rhino.UnitSystem.Meters);
+         var tU = Units.UnitHelper.GetUnitTransformToMeters();
+         bool scaleUnit = Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem != Rhino.UnitSystem.Meters;
+
          // merge Structural Points at same Location according tolg and adjust references in coupling-like elements to point to new merged structural points
          var structural_elements_merged = new List<IGS_StructuralElement>();
          var set_references_back_A = new List<(GH_GeometricGoo<GH_CouplingStruc>, GS_StructuralPoint)>();
@@ -114,7 +119,7 @@ namespace gh_sofistik.Open
 
          // pre-process axis elements and perform check for structural lines if they lie on axis
          var gaxDefinitions = new StringBuilder();
-         var axisAdded = getAxisDefinitions(axis_elements, gaxDefinitions);
+         var axisAdded = getAxisDefinitions(axis_elements, gaxDefinitions, tU);
          var slnReferences = calcSlnReferences(structural_elements, axisAdded, tolg, write_id_back_to_zero, ref id);
 
          // init boundingbox
@@ -166,6 +171,8 @@ namespace gh_sofistik.Open
                var spt = se as GS_StructuralPoint;
                
                Point3d p = spt.Value.Location;
+               if (scaleUnit)
+                  p.Transform(tU);
 
                _boundingBox.Union(spt.Boundingbox);
 
@@ -235,7 +242,10 @@ namespace gh_sofistik.Open
                else
                {
                   sb.AppendLine();
-                  AppendCurveGeometry(sb, sln.Value);
+                  var crv = sln.Value.DuplicateCurve();
+                  if (scaleUnit)
+                     crv.Transform(tU);
+                  AppendCurveGeometry(sb, crv);
                }
 
                AppendCouplingInformation(sb, se, couplingMapLine);
@@ -244,13 +254,18 @@ namespace gh_sofistik.Open
             else if (se is GS_StructuralArea)
             {
                var sar = se as GS_StructuralArea;
-               var brep = sar.Value;
+               var brep = sar.Value.DuplicateBrep();
+               if (scaleUnit)
+                  brep.Transform(tU);
 
                _boundingBox.Union(sar.Boundingbox);
 
                string id_string = se.Id > 0 ? se.Id.ToString() : "-";
                string grp_string = sar.GroupId > 0 ? sar.GroupId.ToString() : "-";
-               string thk_string = sar.Thickness.ToString("F6");
+               var thk_Value = sar.Thickness;
+               if (scaleUnit)
+                  thk_Value *= unitFactor;
+               string thk_string = thk_Value.ToString("F6");
 
                // some preparations
                brep.CullUnusedSurfaces();
@@ -282,7 +297,15 @@ namespace gh_sofistik.Open
                      sb.AppendFormat(" DRX {0:F6} {1:F6} {2:F6}", sar.DirectionLocalX.X, sar.DirectionLocalX.Y, sar.DirectionLocalX.Z);
                   }
 
-                  if(!sar.Alignment.Equals("CENT"))
+                  // write normal
+                  var midN = fc.NormalAt(fc.Domain(0).Mid, fc.Domain(1).Mid);
+                  if(sar.FlipZ)
+                     sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6}", midN.X, midN.Y, midN.Z);
+                  else
+                     sb.AppendFormat(" NX {0:F6} {1:F6} {2:F6}", -midN.X, -midN.Y, -midN.Z);
+
+                  //
+                  if (!sar.Alignment.Equals("CENT"))
                      sb.AppendFormat(" QREF {0}", sar.Alignment);
 
                   if(!sar.MeshOptions.Equals("AUTO"))
@@ -462,12 +485,12 @@ namespace gh_sofistik.Open
                structural_elements_merged.Add(se);
       }
 
-      private List<(string, Curve)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions)
+      private List<(string, Curve)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions, Transform tU)
       {
-         var addedAxis = new List<(string, Curve)>();         
+         var addedAxis = new List<(string, Curve)>();
          foreach (var ax in axis_elements)
          {
-            var res = ax.GetAxisDefinition(axisDefinitions, addedAxis);
+            var res = ax.GetAxisDefinition(axisDefinitions, addedAxis, tU);
             if (res.Item1 != GH_RuntimeMessageLevel.Blank)
                AddRuntimeMessage(res.Item1, res.Item2);
          }
@@ -722,7 +745,7 @@ namespace gh_sofistik.Open
                if (!cpl.FixLiteral.Equals(""))
                   sb.AppendFormat(" {0}", cpl.FixLiteral);
                
-               sb.AppendFormat(" REF {0}", cpl.Value.Reference_B.Id);               
+               sb.AppendFormat(" REF {0}", cpl.Value.Reference_B.Id);
 
                if(cpl.GroupId > 0)
                   sb.AppendFormat(" GRP {0}", cpl.GroupId);
@@ -770,12 +793,12 @@ namespace gh_sofistik.Open
             {
 
                sb.AppendFormat(" SPTS REF {0}", ecpl.Value.Reference_B.Id);
-               
 
                //sb.Append(" TYP 'C'");
 
                sb.AppendFormat(" CP {0}", ecpl.Axial_stiffness);
                sb.AppendFormat(" CM {0}", ecpl.Rotational_stiffness);
+               sb.AppendFormat(" CQ {0}", ecpl.Transversal_stiffness);
 
                if (!ecpl.Direction.IsTiny())
                   sb.AppendFormat(" DX {0} DY {1} DZ {2}", ecpl.Direction.X, ecpl.Direction.Y, ecpl.Direction.Z);
@@ -811,6 +834,7 @@ namespace gh_sofistik.Open
 
             sb.AppendFormat(" CA {0}", ecpl.Axial_stiffness);
             sb.AppendFormat(" CD {0}", ecpl.Rotational_stiffness);
+            sb.AppendFormat(" CL {0}", ecpl.Transversal_stiffness);
 
             if (!ecpl.Direction.IsTiny())
                sb.AppendFormat(" DRX {0} DRY {1} DRZ {2}", ecpl.Direction.X, ecpl.Direction.Y, ecpl.Direction.Z);
@@ -1073,8 +1097,7 @@ namespace gh_sofistik.Open
 
    public interface IGH_Axis
    {
-      (GH_RuntimeMessageLevel, string) GetAxisDefinition(StringBuilder sb, List<(string, Curve)> addedAxis);
+      (GH_RuntimeMessageLevel, string) GetAxisDefinition(StringBuilder sb, List<(string, Curve)> addedAxis, Transform tU);
    }
 
 }
-

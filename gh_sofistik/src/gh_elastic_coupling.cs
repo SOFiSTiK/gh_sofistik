@@ -3,11 +3,8 @@ using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
 
    public class GH_Elastic_Coupling : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
@@ -19,6 +16,8 @@ namespace gh_sofistik.Open
       public double Axial_stiffness { get; set; } = 0.0;
 
       public double Rotational_stiffness { get; set; } = 0.0;
+
+      public double Transversal_stiffness { get; set; } = 0.0;
 
       public Vector3d Direction { get; set; } = new Vector3d();
 
@@ -93,24 +92,15 @@ namespace gh_sofistik.Open
             _cplCond.DrawInfo(args);
 
          _cplCond.Draw(args.Pipeline, col);
-
-         /*
-         if (Value.IsACurve)
-            args.Pipeline.DrawCurve(Value.CurveA, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointA.Location, Rhino.Display.PointStyle.X, 5, col);
-         if (Value.IsBCurve)
-            args.Pipeline.DrawCurve(Value.CurveB, col, args.Thickness + 1);
-         else
-            args.Pipeline.DrawPoint(Value.PointB.Location, Rhino.Display.PointStyle.X, 5, col);         
-         */
       }
 
       private void updateECoupling()
       {
          _cplCond = new CouplingCondition();
          List<string> sl = new List<string>();
-         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness);
+         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
+         if (GroupId > 0)
+            sl.Add("Grp: " + GroupId);
 
          _cplCond.CreateDottedLineSymbols(Value.GetConnectionLines(), sl);
       }
@@ -136,6 +126,7 @@ namespace gh_sofistik.Open
          nc.GroupId = GroupId;
          nc.Axial_stiffness = Axial_stiffness;
          nc.Rotational_stiffness = Rotational_stiffness;
+         nc.Transversal_stiffness = Transversal_stiffness;
          nc.Direction = Direction;
          return nc;
       }
@@ -175,7 +166,7 @@ namespace gh_sofistik.Open
 
       public override string ToString()
       {
-         return "Elastic Coupling" + (GroupId == 0 ? "" : ", Grp Id: " + GroupId) + ", AxStf: " + Axial_stiffness + ", RotStf: " + Rotational_stiffness + (Direction.IsTiny() ? "" : ", Dir: " + Direction);
+         return "Elastic Coupling" + (GroupId == 0 ? "" : ", Grp Id: " + GroupId) + ", AxStf: " + Axial_stiffness + ", RotStf: " + Rotational_stiffness + ", TransStf: " + Transversal_stiffness + (Direction.IsTiny() ? "" : ", Dir: " + Direction);
       }
    }
 
@@ -212,6 +203,7 @@ namespace gh_sofistik.Open
          pManager.AddIntegerParameter("Group", "Group", "Group number of this Elastic Coupling", GH_ParamAccess.list, 0);
          pManager.AddNumberParameter("Axial Stiffness", "Ax. Stf.", "Stiffness of this Elastic Coupling in axial direction [kN/m^3]", GH_ParamAccess.list, 0.0);
          pManager.AddNumberParameter("Rotational Stiffness", "Rot. Stf", "Stiffness of this Elastic Coupling in rotational direction [kNm/rad]", GH_ParamAccess.list, 0.0);
+         pManager.AddNumberParameter("Transversal Stiffness", "Tr. Stf", "Stiffness of this Elastic Coupling in transversal direction [kN/m^3]", GH_ParamAccess.list, 0.0);
          pManager.AddVectorParameter("Explicit Direction", "Dir", "Explicit Direction of this Elastic Coupling. If no direction is given, the Coupling is aligned towards its reference point (default)", GH_ParamAccess.list, new Vector3d());
       }
 
@@ -228,22 +220,24 @@ namespace gh_sofistik.Open
          List<int> groups = da.GetDataList<int>(2);
          List<double> axial_stiffness = da.GetDataList<double>(3);
          List<double> rotational_stiffness = da.GetDataList<double>(4);
-         List<Vector3d> direction = da.GetDataList<Vector3d>(5);
+         List<double> transversal_stiffness = da.GetDataList<double>(5);
+         List<Vector3d> direction = da.GetDataList<Vector3d>(6);
 
          List<GH_Elastic_Coupling> out_list = new List<GH_Elastic_Coupling>();
 
-         int count = Math.Min(a_list.Count, b_list.Count);
+         int count = Math.Max(a_list.Count, b_list.Count);
 
          for (int i = 0; i < count; i++)
          {
-            IGH_GeometricGoo a_goo = a_list[i];
-            IGH_GeometricGoo b_goo = b_list[i];
+            IGH_GeometricGoo a_goo = a_list.GetItemOrLast(i);
+            IGH_GeometricGoo b_goo = b_list.GetItemOrLast(i);
             
             GH_Elastic_Coupling spr = new GH_Elastic_Coupling();
             spr.Value = new GH_CouplingStruc();
             spr.GroupId = groups.GetItemOrLast(i);
             spr.Axial_stiffness = axial_stiffness.GetItemOrLast(i);
             spr.Rotational_stiffness = rotational_stiffness.GetItemOrLast(i);
+            spr.Transversal_stiffness = transversal_stiffness.GetItemOrLast(i);
             spr.Direction = direction.GetItemOrLast(i);
             
             Enum state = spr.Value.SetInputs(a_goo, b_goo);

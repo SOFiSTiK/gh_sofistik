@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="GH_IO">
       <HintPath>C:\Program Files\Rhino 6\Plug-ins\Grasshopper\GH_IO.dll</HintPath>
@@ -54,6 +57,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\assemblyInfo.cs" />
+    <Compile Include="src\assemblyLoader.cs" />
     <Compile Include="src\gh_aqua.cs" />
     <Compile Include="src\gh_section.cs" />
     <Compile Include="src\gh_spring.cs" />
@@ -62,6 +67,7 @@
     <Compile Include="src\gh_coupling.cs" />
     <Compile Include="src\gh_create_axis.cs" />
     <Compile Include="src\gh_helper.cs" />
+    <Compile Include="src\gh_units.cs" />
     <Compile Include="src\gs_area_load.cs" />
     <Compile Include="src\gh_global_settings.cs" />
     <Compile Include="src\gs_line_load.cs" />
@@ -92,6 +98,8 @@
     <EmbeddedResource Include="src\embedded\images\aqua_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\section_brep_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\section_place_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\gh_sofistik_splash_500x200.png" />
+    <EmbeddedResource Include="src\embedded\images\section_attributes_24x24.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

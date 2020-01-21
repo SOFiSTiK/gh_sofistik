@@ -1,17 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using GH_IO.Serialization;
 using Grasshopper.Kernel;
-using Grasshopper.Kernel.Types;
-using Rhino;
-using Rhino.DocObjects;
-using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.General
 {
    public class TextStream : GH_Component
    {
@@ -108,7 +101,6 @@ namespace gh_sofistik.Open
          _path_active = file_name;
       }
 
-
       public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
       {
          base.AppendAdditionalComponentMenuItems(menu);
@@ -120,7 +112,6 @@ namespace gh_sofistik.Open
          if (System.IO.Path.GetExtension(_path_active).ToLower() == ".dat")
          {
             Menu_AppendSeparator(menu);
-            //Menu_AppendItem(menu, "Calculate Project", Menu_OnCalculateWPS);
             Menu_AppendItem(menu, "System Visualisation", Menu_OnOpenAnimator);
             Menu_AppendItem(menu, "Open Teddy", Menu_OnOpenTeddy);
          }
@@ -165,11 +156,6 @@ namespace gh_sofistik.Open
          }
       }
 
-      private void Menu_OnCalculateWPS(Object sender, EventArgs e)
-      {
-         throw new NotImplementedException();
-      }
-
       private void Menu_OnOpenAnimator(Object sender, EventArgs e)
       {
          var cdb_path = System.IO.Path.ChangeExtension(_path_active, ".cdb");
@@ -187,9 +173,9 @@ namespace gh_sofistik.Open
 
       private void Menu_OnOpenTeddy(Object sender, EventArgs e)
       {
-         if(System.IO.Path.GetExtension(_path_active) == ".dat")
+         if (System.IO.Path.GetExtension(_path_active) == ".dat")
          {
-            if(System.IO.File.Exists(_path_active))
+            if (System.IO.File.Exists(_path_active))
             {
                var process = new System.Diagnostics.Process();
                process.StartInfo.FileName = _path_active;

@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
@@ -10,7 +7,7 @@ using Rhino;
 using Rhino.DocObjects;
 using Rhino.Geometry;
 
-namespace gh_sofistik.Open
+namespace gh_sofistik.Structure
 {
    public interface IGS_StructuralElement
    {
