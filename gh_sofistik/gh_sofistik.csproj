@@ -60,6 +60,7 @@
     <Compile Include="src\assemblyInfo.cs" />
     <Compile Include="src\assemblyLoader.cs" />
     <Compile Include="src\gh_aqua.cs" />
+    <Compile Include="src\gh_ase.cs" />
     <Compile Include="src\gh_section.cs" />
     <Compile Include="src\gh_spring.cs" />
     <Compile Include="src\gh_elastic_coupling.cs" />
@@ -77,8 +78,17 @@
     <Compile Include="src\gs_sofiload.cs" />
     <Compile Include="src\gh_sofimshc.cs" />
     <Compile Include="src\gh_spt_factory.cs" />
+    <Compile Include="src\gh_sofistik_project.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="src\embedded\images\animator_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\ase_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\open_explorer_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\report_browser_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\resultviewer_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\teddy_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\wingraf_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\sofistik_project_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\file_dat_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\loadcase_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\sofiload_24x24.png" />
@@ -97,9 +107,10 @@
     <EmbeddedResource Include="src\embedded\images\user_options_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\aqua_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\section_brep_24x24.png" />
-    <EmbeddedResource Include="src\embedded\images\section_place_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\section_view_24x24.png" />
     <EmbeddedResource Include="src\embedded\images\gh_sofistik_splash_500x200.png" />
     <EmbeddedResource Include="src\embedded\images\section_attributes_24x24.png" />
+    <EmbeddedResource Include="src\embedded\images\section_attributes_loop_24x24.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

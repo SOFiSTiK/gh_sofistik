@@ -5,6 +5,7 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Grasshopper.Kernel.Data;
 using Rhino.Geometry;
+using System.Linq;
 
 namespace gh_sofistik
 {
@@ -295,7 +296,7 @@ namespace gh_sofistik
          }
       }
 
-      public static bool DrawInfo { get; set; } = false;
+      public static bool DrawInfo { get; set; } = true;
 
       public static System.Drawing.Color DrawColorStructuralElements { get; set; } = System.Drawing.Color.Red;
 
@@ -305,6 +306,140 @@ namespace gh_sofistik
 
       public static System.Drawing.Color DrawColorInfoDotBack { get; set; } = System.Drawing.Color.LimeGreen;
       public static System.Drawing.Color DrawColorInfoDotText { get; set; } = System.Drawing.Color.Black;
+      public static Rhino.Display.DisplayMaterial DrawMaterialStructure
+      {
+         get
+         {
+            if (_drawMaterialStructure == null)
+            {
+               _drawMaterialStructure = new Rhino.Display.DisplayMaterial();
+               _drawMaterialStructure.Shine = 0.5;
+               _drawMaterialStructure.Transparency = 0.6;
+            }
+            if (hasMaterialColorChanged(_drawMaterialStructure, DrawColorStructuralElements))
+            {
+               SetMaterialColors(_drawMaterialStructure, DrawColorStructuralElements);
+            }
+            return _drawMaterialStructure;
+         }
+      }
+      private static Rhino.Display.DisplayMaterial _drawMaterialStructure;
+      public static Rhino.Display.DisplayMaterial DrawMaterialLoads
+      {
+         get
+         {
+            if (_drawMaterialLoads == null)
+            {
+               _drawMaterialLoads = new Rhino.Display.DisplayMaterial();
+               _drawMaterialLoads.Shine = 0.5;
+               _drawMaterialLoads.Transparency = 0.95;
+            }
+            if (hasMaterialColorChanged(_drawMaterialLoads, DrawColorLoads))
+            {
+               SetMaterialColors(_drawMaterialLoads, DrawColorLoads);
+            }
+            return _drawMaterialLoads;
+         }
+      }
+      private static Rhino.Display.DisplayMaterial _drawMaterialLoads;
+      public static void SetMaterialColors(Rhino.Display.DisplayMaterial mat, System.Drawing.Color col)
+      {
+         mat.Diffuse = col;
+         mat.Emission = changeColorBrightness(col, -0.5f);
+         mat.Specular = System.Drawing.Color.White;
+         mat.BackSpecular = System.Drawing.Color.White;
+      }
+      private static bool hasMaterialColorChanged(Rhino.Display.DisplayMaterial mat, System.Drawing.Color col)
+      {
+         return (mat.Diffuse.R != col.R || mat.Diffuse.G != col.G || mat.Diffuse.B != col.B);
+      }
+
+      private static System.Drawing.Color changeColorBrightness(System.Drawing.Color col, float correctionFactor)
+      {
+         float red = (float)col.R;
+         float green = (float)col.G;
+         float blue = (float)col.B;
+
+         if (correctionFactor < -1)
+            correctionFactor = -1;
+         if (correctionFactor > 1)
+            correctionFactor = 1;
+
+         if (correctionFactor < 0)
+         {
+            correctionFactor = 1 + correctionFactor;
+            red *= correctionFactor;
+            green *= correctionFactor;
+            blue *= correctionFactor;
+         }
+         else
+         {
+            red = (255 - red) * correctionFactor + red;
+            green = (255 - green) * correctionFactor + green;
+            blue = (255 - blue) * correctionFactor + blue;
+         }
+
+         return System.Drawing.Color.FromArgb(col.A, (int)red, (int)green, (int)blue);
+      }
+
+      //h[0-359] s[0-1] v[0-1]
+      public static System.Drawing.Color HsvToColor(double h, double s, double v)
+      {
+         double hm = h % 360;
+         int hi = (int)Math.Floor((double)hm / (double)60);
+         double f = ((double)hm / (double)60) - hi;
+         double p = v * (1 - s);
+         double q = v * (1 - (s * f));
+         double t = v * (1 - s * (1 - f));
+         double r = 0; double g = 0; double b = 0;
+         if (hi == 0)
+         {
+            r = v;
+            g = t;
+            b = p;
+         }
+         else if (hi == 1)
+         {
+            r = q;
+            g = v;
+            b = p;
+         }
+         else if (hi == 2)
+         {
+            r = p;
+            g = v;
+            b = t;
+         }
+         else if (hi == 3)
+         {
+            r = p;
+            g = q;
+            b = v;
+         }
+         else if (hi == 4)
+         {
+            r = t;
+            g = p;
+            b = v;
+         }
+         else if (hi == 5)
+         {
+            r = v;
+            g = p;
+            b = q;
+         }
+         int ri = (int)(r * 255);
+         int gi = (int)(g * 255);
+         int bi = (int)(b * 255);
+         if (ri < 0) ri = 0;
+         if (ri > 255) ri = 255;
+         if (gi < 0) gi = 0;
+         if (gi > 255) gi = 255;
+         if (bi < 0) bi = 0;
+         if (bi > 255) bi = 255;
+
+         return System.Drawing.Color.FromArgb(ri, gi, bi);
+      }
 
       public static bool CheckSelection(System.Drawing.Color c)
       {
@@ -455,7 +590,7 @@ namespace gh_sofistik
 
    }
 
-   static class TransformUtils
+   public static class TransformUtils
    {
       public static Plane GetPlaneAtAreaPoint(Point3d areaPoint, BrepFace bf)
       {
@@ -522,10 +657,10 @@ namespace gh_sofistik
          Vector3d dy = Vector3d.CrossProduct(dz, dx);
          if (dy.Length < 0.0001)
          {
-            dy = Vector3d.CrossProduct(dz, -1 * Vector3d.ZAxis);
+            dy = Vector3d.CrossProduct(dz, Vector3d.XAxis);
             if (dy.Length < 0.0001)
             {
-               dy = Vector3d.CrossProduct(dz, Vector3d.XAxis);
+               dy = Vector3d.CrossProduct(dz, -1 * Vector3d.ZAxis);
             }
          }
 
@@ -552,6 +687,34 @@ namespace gh_sofistik
          }
 
          public SymbolF(SymbolF s)
+         {
+            this._line = new Line(new Point3d(s.ALine.From), new Point3d(s.ALine.To));
+         }
+
+         public void Transform(Transform t)
+         {
+            _line.Transform(t);
+         }
+
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+         {
+            pipeline.DrawArrow(_line, col, 0.0, 0.2);
+         }
+      }
+
+      private class SymbolDisp
+      {
+         private Line _line;
+
+         public Line ALine { get { return _line; } }
+
+         public SymbolDisp(Transform t)
+         {
+            _line = new Line(Point3d.Origin, new Point3d(Vector3d.ZAxis));
+            _line.Transform(t);
+         }
+
+         public SymbolDisp(SymbolDisp s)
          {
             this._line = new Line(new Point3d(s.ALine.From), new Point3d(s.ALine.To));
          }
@@ -607,11 +770,50 @@ namespace gh_sofistik
          }
       }
 
+      private class SymbolDispRot
+      {
+         private Arc _arc;
+         private Line _lineBegin;
+         private Line _lineEnd;
+
+         public SymbolDispRot(Transform t, double length)
+         {
+            _arc = new Arc(Point3d.Origin, 0.5, length);
+            _lineBegin = new Line(Point3d.Origin, _arc.StartPoint);
+            _lineEnd = new Line(Point3d.Origin, _arc.EndPoint);
+            _arc.Transform(t);
+            _lineBegin.Transform(t);
+            _lineEnd.Transform(t);
+         }
+
+         public SymbolDispRot(SymbolDispRot s)
+         {
+            this._arc = new Arc(new Plane(s._arc.Plane), s._arc.Radius, s._arc.Angle);
+            this._lineBegin = new Line(s._lineBegin.From, s._lineBegin.To);
+            this._lineEnd = new Line(s._lineEnd.From, s._lineEnd.To);
+         }
+
+         public void Transform(Transform t)
+         {
+            _arc.Transform(t);
+            _lineBegin.Transform(t);
+            _lineEnd.Transform(t);
+         }
+
+         public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
+         {
+            pipeline.DrawArc(_arc, col);
+            pipeline.DrawLine(_lineBegin, col);
+            pipeline.DrawLine(_lineEnd, col);
+         }
+      }
+
       public List<Transform> Transforms { get; set; } = new List<Transform>();
 
       private SymbolF _symbolF;
-
       private SymbolM _symbolM;
+      private SymbolDisp _symbolDisp;
+      private SymbolDispRot _symbolDispRot;
 
       private bool _valid = false;
 
@@ -637,7 +839,9 @@ namespace gh_sofistik
       }
       
       private double _scale = 0;
-      private double _density = 0;      
+      private double _density = 0;
+      private List<Point3d> _endPoints_F = new List<Point3d>();
+      private List<Point3d> _endPoints_M = new List<Point3d>();
 
       public LoadCondition()
       {
@@ -648,78 +852,116 @@ namespace gh_sofistik
       {
          _scale = DrawUtil.ScaleFactorLoads;
          _density = DrawUtil.DensityFactorLoads;
+         initForceMoment(force, moment);
+      }
 
-         Transform _orientationF = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(force) * -1);
-         Transform _orientationM = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(moment) * -1);
-         Transform _lengthF = Rhino.Geometry.Transform.Scale(Point3d.Origin, force.Length);
-         Transform _lengthM = Rhino.Geometry.Transform.Scale(Point3d.Origin, moment.Length);
+      public LoadCondition(Vector3d force, Vector3d moment, Vector3d displacement, Vector3d displacementRotational)
+      {
+         _scale = DrawUtil.ScaleFactorLoads;
+         _density = DrawUtil.DensityFactorLoads;
+         initForceMoment(force, moment);
+         initDisplacements(displacement, displacementRotational);
+      }
 
-         Transform tF = _orientationF * _lengthF;
-         Transform tM = _orientationM * _lengthM;
+      private void initForceMoment(Vector3d force, Vector3d moment)
+      {
+         var orientationF = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(force) * -1);
+         var orientationM = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(moment) * -1);
+         var scaleF = Transform.Scale(Point3d.Origin, force.Length);
+         var scaleM = Transform.Scale(Point3d.Origin, moment.Length);
 
-         if (!force.IsTiny()) _symbolF = new SymbolF(tF);
-         if (!moment.IsTiny()) _symbolM = new SymbolM(tM);
+         if (!force.IsTiny()) _symbolF = new SymbolF(orientationF * scaleF);
+         if (!moment.IsTiny()) _symbolM = new SymbolM(orientationM * scaleM);
+      }
+
+      private void initDisplacements(Vector3d displacement, Vector3d displacementRotational)
+      {
+         var orientationDisp = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(displacement));
+         var orientationDispRot = TransformUtils.GetGlobalTransformPoint(Vector3d.XAxis, new Vector3d(displacementRotational));
+         var scaleDisp = Transform.Scale(Point3d.Origin, displacement.Length);
+
+         if (!displacement.IsTiny()) _symbolDisp = new SymbolDisp(orientationDisp * scaleDisp);
+         if (!displacementRotational.IsTiny()) _symbolDispRot = new SymbolDispRot(orientationDispRot, displacementRotational.Length);
       }
 
       public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
       {
-         List<Point3d> _endPoints_F = new List<Point3d>();
-         List<Point3d> _endPoints_M = new List<Point3d>();
+         _endPoints_F.Clear();
+         _endPoints_M.Clear();
 
          foreach (Transform t in Transforms)
          {
-            if (!(_symbolF is null))
+            if (_symbolF != null)
             {
-               SymbolF _temp = new SymbolF(_symbolF);
-               _temp.Transform(t);
-               _temp.Draw(pipeline, col);               
-               _endPoints_F.Add(_temp.ALine.From);
+               var temp = new SymbolF(_symbolF);
+               temp.Transform(t);
+               temp.Draw(pipeline, col);
+               _endPoints_F.Add(temp.ALine.From);
             }
-            if (!(_symbolM is null))
+            if (_symbolM != null)
             {
-               SymbolM _temp = new SymbolM(_symbolM);
-               _temp.Transform(t);
-               _temp.Draw(pipeline, col);
-               _endPoints_M.Add(_temp.APoint);
+               var temp = new SymbolM(_symbolM);
+               temp.Transform(t);
+               temp.Draw(pipeline, col);
+               _endPoints_M.Add(temp.APoint);
             }
-            
+            if (_symbolDisp != null)
+            {
+               var temp = new SymbolDisp(_symbolDisp);
+               temp.Transform(t);
+               temp.Draw(pipeline, col);
+            }
+            if (_symbolDispRot != null)
+            {
+               var temp = new SymbolDispRot(_symbolDispRot);
+               temp.Transform(t);
+               temp.Draw(pipeline, col);
+            }
          }
 
-         pipeline.DrawDottedPolyline(_endPoints_F, col, false);
-         pipeline.DrawDottedPolyline(_endPoints_M, col, false);
+         if (_endPoints_F.Count > 1)
+            pipeline.DrawDottedPolyline(_endPoints_F, col, false);
+         if (_endPoints_M.Count > 1)
+            pipeline.DrawDottedPolyline(_endPoints_M, col, false);
       }
 
       public void Draw2(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
       {
-         List<Point3d> _endPoints_F = new List<Point3d>();
-         List<Point3d> _endPoints_M = new List<Point3d>();
+         _endPoints_F.Clear();
+         _endPoints_M.Clear();
 
          foreach (Transform t in Transforms)
          {
-
             pipeline.PushModelTransform(t);
-
-            if (!(_symbolF is null))
+            if (_symbolF != null)
             {
                _symbolF.Draw(pipeline, col);
                Point3d p = new Point3d(_symbolF.ALine.From);
                p.Transform(t);
                _endPoints_F.Add(p);
             }
-            if (!(_symbolM is null))
+            if (_symbolM != null)
             {
                _symbolM.Draw(pipeline, col);
                Point3d p = new Point3d(_symbolM.APoint);
                p.Transform(t);
                _endPoints_M.Add(p);
             }
-
+            if (_symbolDisp != null)
+            {
+               _symbolDisp.Draw(pipeline, col);
+            }
+            if (_symbolDispRot != null)
+            {
+               _symbolDispRot.Draw(pipeline, col);
+            }
             pipeline.PopModelTransform();
-
          }
-        
-         pipeline.DrawDottedPolyline(_endPoints_F, DrawUtil.DrawColorLoads, false);
-         pipeline.DrawDottedPolyline(_endPoints_M, DrawUtil.DrawColorLoads, false);
+
+         if (_endPoints_F.Count > 1)
+            pipeline.DrawDottedPolyline(_endPoints_F, col, false);
+         if (_endPoints_M.Count > 1)
+            pipeline.DrawDottedPolyline(_endPoints_M, col, false);
       }
    }
 
@@ -957,7 +1199,7 @@ namespace gh_sofistik
 
       private bool _valid = false;
 
-      public bool isValid
+      public bool IsValid
       {
          get
          {
@@ -1257,8 +1499,6 @@ namespace gh_sofistik
       private List<ISymbol> _symbols;
       private double _density;
       private double _scale;
-      private Point3d[] _mid_points;
-      private List<string> _sList;
 
       public bool isValid
       {
@@ -1285,78 +1525,34 @@ namespace gh_sofistik
          _scale = DrawUtil.ScaleFactorSupports;
       }
 
-      public void CreateCouplingSymbols(List<Line> lines, List<string> info)
+      public void CreateCouplingSymbols(List<Line> lines)
       {
-         createInfo(lines, info);
-
          foreach (Line l in lines)
             _symbols.Add(new Coupling_Symbol(l));
       }
 
-      public void CreateCouplingSpringSymbols(List<Line> lines, List<string> info, Vector3d dir)
+      public void CreateCouplingSpringSymbols(List<Line> lines, Vector3d dir)
       {
-         createInfo(lines, info);
-
          foreach (Line l in lines)
             _symbols.Add(new CouplingSpring_Symbol(l, dir));
       }
 
-      public void CreateSpringSymbols(List<Point3d> points, List<string> info, Vector3d dir)
+      public void CreateSpringSymbols(List<Point3d> points, Vector3d dir)
       {
-         List<Line> ll = new List<Line>();
-         ll.Add(new Line(points[0], points[points.Count-1]));
-         createInfo(ll, info);
-
          foreach (Point3d pt in points)
             _symbols.Add(new Spring_Symbol(pt, dir));
       }
 
-      public void CreateDottedLineSymbols(List<Line> lines, List<string> info)
+      public void CreateDottedLineSymbols(List<Line> lines)
       {
-         createInfo(lines, info);
-
          foreach (Line l in lines)
             _symbols.Add(new DottedLine_Symbol(l));
-      }
-
-      private void createInfo(List<Line> lines, List<string> info)
-      {
-         _mid_points = new Point3d[4];
-
-         _mid_points[0] = (lines[0].From + lines[0].To) * 0.5;
-         _mid_points[1] = (lines[lines.Count - 1].From + lines[lines.Count - 1].To) * 0.5;
-         _mid_points[2] = (lines[0].From + lines[lines.Count - 1].From) * 0.5;
-         _mid_points[3] = (lines[0].To + lines[lines.Count - 1].To) * 0.5;
-
-         _sList = info;
       }
 
       public void Draw(Rhino.Display.DisplayPipeline pipeline, System.Drawing.Color col)
       {
          foreach (ISymbol s in _symbols)
             s.Draw(pipeline, col);
-      }
-
-      public void DrawInfo(GH_PreviewWireArgs args)
-      {
-         if (DrawUtil.DrawInfo)
-         {
-            //pipeline.Draw2dText(s, System.Drawing.Color.Black, _mid, true);
-            Point2d mid_2d = args.Viewport.WorldToClient(_mid_points[0]);
-            for (int j = 1; j < _mid_points.Length; j++)
-            {
-               Point2d p2d = args.Viewport.WorldToClient(_mid_points[j]);
-               if (p2d.X < mid_2d.X)
-                  mid_2d = p2d;
-            }
-
-            int i = 0;
-            foreach (string s in _sList)
-            {
-               args.Pipeline.DrawDot((float)mid_2d.X - 50, (float)(mid_2d.Y + (i - (_sList.Count - 1) / 2) * 20), s, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
-               i++;
-            }
-         }
       }
    }
 
@@ -1368,7 +1564,7 @@ namespace gh_sofistik
       private double _scale = 0.0;
       private double _density = 1.0;
 
-      public bool isValid
+      public bool IsValid
       {
          get
          {
@@ -1429,4 +1625,33 @@ namespace gh_sofistik
          }
       }
    }
+
+   public class InfoPanel
+   {
+      public List<Point3d> Positions { get; set; } = new List<Point3d>();
+
+      public List<string> Content { get; set; } = new List<string>();
+
+      public void Draw(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (Positions.Any() && Content.Any())
+         {
+            var mid2d = viewport.WorldToClient(Positions.First());
+            for (int i = 1; i < Positions.Count; i++)
+            {
+               var p2d = viewport.WorldToClient(Positions[i]);
+               if (p2d.X < mid2d.X)
+                  mid2d = p2d;
+            }
+
+            var text = "";
+            int j = 0;
+            foreach (var s in Content)
+               text += s + (j++ == Content.Count - 1 ? "" : "\n");
+
+            pipeline.DrawDot((float)mid2d.X - 50, (float)mid2d.Y, text, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+         }
+      }
+   }
+
 }

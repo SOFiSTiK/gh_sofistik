@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
+using System.Windows.Forms;
 using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
@@ -42,6 +43,16 @@ namespace gh_sofistik.Load
 
          return sb.ToString();
       }
+      public LoadCase Duplicate()
+      {
+         return new LoadCase()
+         {
+            Id = Id,
+            Title = Title,
+            Type = Type,
+            Facd = Facd,
+         };
+      }
    }
    public class GS_LoadCase : GH_Goo<LoadCase> //, IGS_LoadCase
    {
@@ -68,7 +79,7 @@ namespace gh_sofistik.Load
 
       public override IGH_Goo Duplicate()
       {
-         return new GS_LoadCase() { Value = new LoadCase(Value) };
+         return new GS_LoadCase() { Value = Value.Duplicate() };
       }
    }
 
@@ -77,7 +88,7 @@ namespace gh_sofistik.Load
       private System.Drawing.Bitmap _icon;
 
       public CreateLoadCase()
-         : base("LoadCase", "LoadCase", "Defines Load Cases for SOFiLOAD", "SOFiSTiK", "Loads")
+         : base("LoadCase Attributes", "LcAttr", "Defines loadcase attributes for SOFiLOAD", "SOFiSTiK", "Loads")
       {}
 
       protected override System.Drawing.Bitmap Icon
@@ -105,7 +116,7 @@ namespace gh_sofistik.Load
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGenericParameter("LoadCase", "Lc", "SOFiSTiK LoadCase Definition", GH_ParamAccess.list);
+         pManager.AddGenericParameter("LoadCase Attributes", "LcAttr", "SOFiSTiK LoadCase Attributes", GH_ParamAccess.list);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
@@ -156,6 +167,7 @@ namespace gh_sofistik.Load
    public class CreateSofiloadInput : GH_Component
    {
       private System.Drawing.Bitmap _icon;
+      private string _manualPath = "";
 
       public CreateSofiloadInput()
          : base("SOFiLOAD", "SOFiLOAD", "Creates a SOFiLOAD input file", "SOFiSTiK", "Loads")
@@ -176,29 +188,63 @@ namespace gh_sofistik.Load
          get { return new Guid("9B69E8B6-D0DE-4B5C-A564-B127961999BD"); }
       }
 
+      public override void AppendAdditionalMenuItems(ToolStripDropDown menu)
+      {
+         base.AppendAdditionalComponentMenuItems(menu);
+
+         if (string.IsNullOrEmpty(_manualPath))
+         {
+            var exeDir = AssemblyHelper.GetSofistikExecutableDir();
+            if (!string.IsNullOrWhiteSpace(exeDir) && System.IO.Directory.Exists(exeDir))
+            {
+               var manualPath = System.IO.Path.Combine(exeDir, "sofiload_1.pdf");
+               if (System.IO.File.Exists(manualPath))
+               {
+                  _manualPath = manualPath;
+               }
+            }
+         }
+
+         if (!string.IsNullOrWhiteSpace(_manualPath) && System.IO.File.Exists(_manualPath))
+         {
+            Menu_AppendSeparator(menu);
+            Menu_AppendItem(menu, "Open Manual", Menu_OnOpenManual);
+         }
+      }
+
+      private void Menu_OnOpenManual(object sender, EventArgs e)
+      {
+         if (!string.IsNullOrWhiteSpace(_manualPath) && System.IO.File.Exists(_manualPath))
+         {
+            System.Diagnostics.Process.Start(@_manualPath);
+         }
+      }
+
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Ld", "Ld", "Collection of SOFiSTiK Load Items", GH_ParamAccess.list);
-         pManager.AddGenericParameter("LoadCase", "Lc", "SOFiSTiK LoadCase Definition", GH_ParamAccess.list);
-         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of loads", GH_ParamAccess.item, string.Empty);
+         pManager.AddGeometryParameter("Ld", "Ld", "Collection of SOFiSTiK Load Items", GH_ParamAccess.tree);
+         pManager.AddGenericParameter("LoadCase", "Lc", "SOFiSTiK LoadCase Definition", GH_ParamAccess.tree);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of loads", GH_ParamAccess.list, string.Empty);
 
+         pManager[0].Optional = true;
          pManager[1].Optional = true;
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("Text input", "O", "SOFiLOAD text input", GH_ParamAccess.item);
+         //pManager.AddTextParameter("Text input", "O", "SOFiLOAD text input", GH_ParamAccess.item);
+         pManager.AddGenericParameter("Text input", "O", "SOFiLOAD text input", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
-         var ldList = da.GetDataList<IGH_Goo>(0);
-         var lcList = da.GetDataList<GS_LoadCase>(1);
-         string text = da.GetData<string>(2);
+         var ldStruc = da.GetDataTree<IGH_GeometricGoo>(0);
+         var lcStruc = da.GetDataTree<IGH_Goo>(1);
+         var textList = da.GetDataList<string>(2);
 
          // get load case definitions
          var all_loads = new List<IGS_Load>();
-         foreach( var it in ldList)
+         foreach( var it in ldStruc.AllData(true))
          {
             if (it is IGS_Load)
                all_loads.Add(it as IGS_Load);
@@ -208,17 +254,27 @@ namespace gh_sofistik.Load
 
          // extract load case headers
          var load_cases = new Dictionary<int, string>();
-         foreach (var ilc in lcList)
+         foreach (var it in lcStruc.AllData(true))
          {
-            if (ilc.Value.Id != 0)
+            if (it is GS_LoadCase)
             {
-               load_cases.Add(ilc.Value.Id, ilc.Value.ToCadinp().Trim());
+               var ilc = it as GS_LoadCase;
+               if (ilc.Value.Id != 0)
+               {
+                  load_cases.Add(ilc.Value.Id, ilc.Value.ToCadinp().Trim());
+               }
+            }
+            else
+            {
+               AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Data conversion failed from " + it.TypeName + " to GS_LoadCase.");
             }
          }
 
          // calc unit conversion factor and scale-transform
-         var tU = Units.UnitHelper.GetUnitTransformToMeters();
-         bool scaleUnit = Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem != Rhino.UnitSystem.Meters;
+         var currentUnitSystem = Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem;
+         bool scaleUnit = currentUnitSystem != Rhino.UnitSystem.Meters;
+         var unitFactor = Rhino.RhinoMath.UnitScale(currentUnitSystem, Rhino.UnitSystem.Meters);
+         var tU = Transform.Scale(Point3d.Origin, unitFactor);
 
          var sb = new StringBuilder();
 
@@ -227,7 +283,12 @@ namespace gh_sofistik.Load
          sb.AppendLine("PAGE UNII 0"); // export always in SOFiSTiK database units
          sb.AppendLine();
 
-         string[,] load_types = { { "PXX", "PYY", "PZZ", "PX", "PY", "PZ" },{ "MXX", "MYY", "MZZ", "MX","MY","MZ"} };
+         if (!all_loads.Any() && !load_cases.Any())
+         {
+            sb.AppendLine("LC 1 FACD 1.0");
+         }
+
+         string[,] load_types = { { "PXX", "PYY", "PZZ", "PX", "PY", "PZ" }, { "MXX", "MYY", "MZZ", "MX", "MY", "MZ" }, { "WXX", "WYY", "WZZ", "WX", "WY", "WZ" }, { "DXX", "DYY", "DZZ", "DX", "DY", "DZ" } };
 
          foreach (var lc_loads in all_loads.GroupBy(ld => ld.LoadCase).OrderBy( ig => ig.Key))
          {
@@ -265,7 +326,7 @@ namespace gh_sofistik.Load
                      if (Math.Abs(pl.Forces[i]) > 1.0E-6)
                      {
                         sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
-                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[0, i + type_off], pl.Forces[i]);                        
+                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[0, i + type_off], pl.Forces[i]);
                         AppendLoadGeometry(sb, plGeo);
                         sb.AppendLine();
                      }
@@ -277,6 +338,28 @@ namespace gh_sofistik.Load
                      {
                         sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
                         sb.AppendFormat(" TYPE {0} {1:F6}", load_types[1, i + type_off], pl.Moments[i]);
+                        AppendLoadGeometry(sb, plGeo);
+                        sb.AppendLine();
+                     }
+                  }
+
+                  for (int i = 0; i < 3; ++i)
+                  {
+                     if (Math.Abs(pl.Displacement[i]) > 1.0E-6)
+                     {
+                        sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
+                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[2, i + type_off], scaleUnit ? pl.Displacement[i] * unitFactor : pl.Displacement[i]);
+                        AppendLoadGeometry(sb, plGeo);
+                        sb.AppendLine();
+                     }
+                  }
+
+                  for (int i = 0; i < 3; ++i)
+                  {
+                     if (Math.Abs(pl.DisplacementRotational[i]) > 1.0E-6)
+                     {
+                        sb.AppendFormat("POIN {0} {1}", ref_string, no_string);
+                        sb.AppendFormat(" TYPE {0} {1:F6}", load_types[3, i + type_off], pl.DisplacementRotational[i] * 1000);
                         AppendLoadGeometry(sb, plGeo);
                         sb.AppendLine();
                      }
@@ -395,15 +478,23 @@ namespace gh_sofistik.Load
             sb.AppendLine();
          }
 
+
          // add additional text
-         if (!string.IsNullOrEmpty(text))
-         {
-            sb.Append(text);
-         }
+         foreach (var text in textList)
+            if (!string.IsNullOrEmpty(text))
+               sb.AppendLine(text);
+
          sb.AppendLine();
+
          sb.AppendLine("END");
 
-         da.SetData(0, sb.ToString());
+         // create output objects
+         var loadModel = new gh_sofistik.General.SofistikModel() { CadInp = sb.ToString(), ModelType = gh_sofistik.General.SofistikModelType.SofiLOAD };
+         var ghLoadModel = new gh_sofistik.General.GH_SofistikModel() { Value = loadModel };
+         // create GH_Structure and use SetDataTree so output has always one branch with index {0}
+         var outStruc = new GH_Structure<gh_sofistik.General.GH_SofistikModel>();
+         outStruc.Append(ghLoadModel);
+         da.SetDataTree(0, outStruc);
       }
 
 

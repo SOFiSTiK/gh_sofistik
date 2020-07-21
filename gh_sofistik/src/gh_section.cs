@@ -12,10 +12,17 @@ namespace gh_sofistik.Section
 
    #region base types
 
+   public enum SectionPointType
+   {
+      StressPoint,
+      PolygonPoint,
+      ReinforcementPoint,
+   }
+
    public enum SectionLoopType
    {
-      Inner,
-      Outer,
+      Outer = 1,
+      Inner = 2,
    }
 
    public enum EdgeTransitionType
@@ -27,6 +34,7 @@ namespace gh_sofistik.Section
    public class SectionPoint
    {
       public string Id { get; set; } = "0";
+      public SectionPointType Type { get; set; }
       public double Y { get; set; } = 0.0;
       public double Z { get; set; } = 0.0;
       public EdgeTransitionType EType { get; set; } = EdgeTransitionType.Fillet;
@@ -37,17 +45,23 @@ namespace gh_sofistik.Section
          return new SectionPoint()
          {
             Id = Id,
+            Type = Type,
             Y = Y,
             Z = Z,
-            EType=EType,
+            EType = EType,
             EdgeTransitionValue1 = EdgeTransitionValue1,
             EdgeTransitionValue2 = EdgeTransitionValue2,
          };
       }
+      public Point3d ToPoint3d()
+      {
+         return new Point3d(0, Y, Z);
+      }
    }
 
-   public class SectionLoop : List<int>
+   public class SectionLoop : List<int>, IComparable
    {
+      public string Id { get; set; } = "";
       public SectionLoopType Type { get; set; } = SectionLoopType.Outer;
       public int MaterialId { get; set; } = 0;
       public int ConstructionStage { get; set; } = 0;
@@ -55,12 +69,45 @@ namespace gh_sofistik.Section
       {
          var res = new SectionLoop()
          {
+            Id = Id,
             Type = Type,
             MaterialId = MaterialId,
             ConstructionStage = ConstructionStage,
          };
          foreach(var i in this)
             res.Add(i);
+         return res;
+      }
+      public int CompareTo(object obj)
+      {
+         if (!(obj is SectionLoop)) return -1;
+         var otherLoop = obj as SectionLoop;
+         return TypeComparison.Invoke(this, otherLoop);
+      }
+      public static Comparison<SectionLoop> TypeComparison = delegate (SectionLoop object1, SectionLoop object2)
+      {
+         return object1.Type.CompareTo(object2.Type);
+      };
+      public static Comparison<SectionLoop> StageComparison = delegate (SectionLoop object1, SectionLoop object2)
+      {
+         return object1.ConstructionStage.CompareTo(object2.ConstructionStage);
+      };
+   }
+
+   public class SectionFace
+   {
+      public string Id { get; set; } = "0";
+      public int OuterLoopIdx { get; set; } = -1;
+      public List<int> InnerLoopIdxList { get; } = new List<int>();
+      public SectionFace Duplicate()
+      {
+         var res = new SectionFace()
+         {
+            Id = Id,
+            OuterLoopIdx = OuterLoopIdx,
+         };
+         foreach (var iLoopIdx in InnerLoopIdxList)
+            res.InnerLoopIdxList.Add(iLoopIdx);
          return res;
       }
    }
@@ -70,39 +117,81 @@ namespace gh_sofistik.Section
       public string Name { get; set; }
       public int Id { get; set; }
       public int MaterialId { get; set; }
-      public double FactorVariableToMeter { get; set; }
       public List<SectionPoint> Points { get; }
       public List<SectionLoop> Loops { get; }
+      public List<SectionFace> Faces { get; }
       public Units.Unit_Length Unit { get; set; }
+      public string SofistikProfile { get; set; }
+      public Point2d SofistikProfileReference { get; set; }
+      public List<string> UserText { get; set; }
 
       public Section()
       {
          Name = "new section";
          Id = 0;
          MaterialId = 0;
-         FactorVariableToMeter = 1.0;
          Points = new List<SectionPoint>();
          Loops = new List<SectionLoop>();
+         Faces = new List<SectionFace>();
          Unit = Units.Unit_Length.None;
+         SofistikProfile = null;
+         SofistikProfileReference = Point2d.Origin;
+         UserText = new List<string>();
       }
 
       public virtual Section Duplicate()
       {
-         var res = new Section();
-         res.Name = Name;
-         res.Id = 0;
-         res.FactorVariableToMeter = FactorVariableToMeter;
-         res.Unit = Unit;
+         var res = new Section()
+         {
+            Id = Id,
+            Name = Name,
+            MaterialId = MaterialId,
+            Unit = Unit,
+            SofistikProfile = SofistikProfile,
+            SofistikProfileReference = SofistikProfileReference,
+         };
          foreach (var pt in Points)
             res.Points.Add(pt.Duplicate());
          foreach (var lp in Loops)
             res.Loops.Add(lp.Duplicate());
+         foreach (var fc in Faces)
+            res.Faces.Add(fc.Duplicate());
+         foreach (var ut in UserText)
+            res.UserText.Add(ut);
          return res;
       }
 
       public override string ToString()
       {
-         return "Name: " + Name + ", Id: " + Id + ", Pts: " + Points.Count + ", Lps: " + Loops.Count;
+         string unit = Units.UnitHelper.MapToString(Unit);
+         string res = "Name: " + Name + "\nId: " + Id + "\nUnit: " + (string.IsNullOrEmpty(unit) ? "RhinoUnit" : unit) + "\nPoints: " + Points.Count + "\nLoops: " + Loops.Count + "\nFaces: " + Faces.Count;
+         return res;
+      }
+
+      public virtual (GH_RuntimeMessageLevel, string) SetReferencePoint(string referencePtId)
+      {
+         if (!string.IsNullOrEmpty(referencePtId))
+         {
+            var referencePt = Points.Find(pt => pt.Id == referencePtId);
+
+            if (referencePt == null)
+               return (GH_RuntimeMessageLevel.Warning, "Point " + referencePtId + " not available in section");
+
+            var my = referencePt.Y;
+            var mz = referencePt.Z;
+
+            foreach (var pt in Points)
+            {
+               pt.Y -= my;
+               pt.Z -= mz;
+            }
+
+            if (!string.IsNullOrEmpty(SofistikProfile))
+            {
+               SofistikProfileReference = new Point2d(my + SofistikProfileReference.X, mz + SofistikProfileReference.Y);
+            }
+         }
+         return (GH_RuntimeMessageLevel.Blank, "");
       }
 
       public virtual void Evaluate()
@@ -115,10 +204,16 @@ namespace gh_sofistik.Section
 
       }
 
-      public virtual List<string> GetVariables()
+      public virtual List<(string, string, string)> GetVariableNames()
       {
-         return new List<string>();
+         return new List<(string, string, string)>();
       }
+
+      public virtual List<Curve> Get3DReinforcements()
+      {
+         return new List<Curve>();
+      }
+
       /*
       private static Arc CreateTrimFillet(double R, ref Line l1, ref Line l2)
       {
@@ -214,7 +309,7 @@ namespace gh_sofistik.Section
          return Line.Unset;
       }
 
-      private PolyCurve GetPolyCurve(SectionLoop loop)
+      protected PolyCurve GetPolyCurve(SectionLoop loop)
       {
          var curve = new PolyCurve();
          if (loop.Count < 2)
@@ -225,10 +320,10 @@ namespace gh_sofistik.Section
          var chamfers = new Dictionary<int, Line>();
 
          // create lines
-         Point3d p1 = new Point3d(0.0, Points[loop[0]].Y, Points[loop[0]].Z);
+         Point3d p1 = Points[loop[0]].ToPoint3d();
          for (int i = 1; i < loop.Count; ++i)
          {
-            Point3d p2 = new Point3d(0.0, Points[loop[i]].Y, Points[loop[i]].Z);
+            Point3d p2 = Points[loop[i]].ToPoint3d();
 
             lines.Add(new Line(p1, p2));
             p1 = p2;
@@ -293,59 +388,74 @@ namespace gh_sofistik.Section
          return curve;
       }
 
-      public List<PolyCurve> GetBounds()
+      protected void getUnitScalingInformation(out bool scalingRequired, out double scalingFactor, out Transform scalingTransform)
       {
-         var bounds = new List<PolyCurve>();
-
-         bool scaleToGlobalUnits = false;
-         Transform tU = Transform.Identity;
+         scalingRequired = false;
+         scalingFactor = 1.0;
+         scalingTransform = Transform.Identity;
          var sectionUnitsRhino = Units.UnitHelper.MapToRhinoUnits(Unit);
          if (Unit != Units.Unit_Length.None && sectionUnitsRhino != Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem)
          {
-            scaleToGlobalUnits = true;
-            var sFac = Rhino.RhinoMath.UnitScale(sectionUnitsRhino, Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem);
-            tU = Transform.Scale(Point3d.Origin, sFac);
+            scalingRequired = true;
+            scalingFactor = Rhino.RhinoMath.UnitScale(sectionUnitsRhino, Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem);
+            scalingTransform = Transform.Scale(Point3d.Origin, scalingFactor);
          }
-
-         foreach (var loop in Loops)
-         {
-            var bound = GetPolyCurve(loop);
-            if (bound.SpanCount > 0)
-            {
-               if (scaleToGlobalUnits)
-                  bound.Transform(tU);
-               bounds.Add(bound);
-            }
-         }
-
-         return bounds;
       }
 
-      public Dictionary<string, Point3d> GetPoints()
+      public List<List<PolyCurve>> Get3DBounds()
+      {
+         var res = new List<List<PolyCurve>>();
+
+         getUnitScalingInformation(out var scalingRequired, out var scalingFactor, out var scalingTransform);
+
+         foreach (var face in Faces)
+         {
+            var faceBounds = new List<PolyCurve>();
+
+            var outerBound = GetPolyCurve(Loops[face.OuterLoopIdx]);
+            if (outerBound.SpanCount > 0)
+               faceBounds.Add(outerBound);
+
+            foreach(var innerLoopIdx in face.InnerLoopIdxList)
+            {
+               var innerBound = GetPolyCurve(Loops[innerLoopIdx]);
+               if (innerBound.SpanCount > 0)
+                  faceBounds.Add(innerBound);
+            }
+
+            if (scalingRequired)
+               foreach (var bound in faceBounds)
+                  bound.Transform(scalingTransform);
+
+            res.Add(faceBounds);
+         }
+
+         return res;
+      }
+
+      public Dictionary<string, Point3d> Get3DPoints()
       {
          var points3d = new Dictionary<string, Point3d>();
 
-         bool scaleToGlobalUnits = false;
-         var sFac = 1.0;
-         var sectionUnitsRhino = Units.UnitHelper.MapToRhinoUnits(Unit);
-         if (Unit != Units.Unit_Length.None && sectionUnitsRhino != Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem)
-         {
-            scaleToGlobalUnits = true;
-            sFac = Rhino.RhinoMath.UnitScale(sectionUnitsRhino, Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem);
-         }
+         getUnitScalingInformation(out var scalingRequired, out var scalingFactor, out var scalingTransform);
 
          foreach (var pt in Points)
          {
             if (!points3d.ContainsKey(pt.Id))
             {
-               var pt3d = new Point3d(0.0, pt.Y, pt.Z);
-               if (scaleToGlobalUnits)
-                  pt3d *= sFac;
+               var pt3d = pt.ToPoint3d();
+               if (scalingRequired)
+                  pt3d *= scalingFactor;
                points3d.Add(pt.Id, pt3d);
             }
          }
 
          return points3d;
+      }
+
+      public virtual int GetUnitSet()
+      {
+         return 0;
       }
 
       public virtual (GH_RuntimeMessageLevel, string) GetSectionDefinition(StringBuilder sb)
@@ -357,38 +467,54 @@ namespace gh_sofistik.Section
          else
             unitFactor = Rhino.RhinoMath.UnitScale(Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem, Rhino.UnitSystem.Meters);
 
-         // write section
-         sb.Append("SECT " + Id);
-         if (MaterialId != 0)
-            sb.Append(" MNO " + MaterialId);
-         sb.Append(" TITL '" + Name + "'");
-         sb.AppendLine();
-
-         sb.AppendLine();
-
-         foreach (var lp in Loops)
+         if (!string.IsNullOrEmpty(SofistikProfile))
          {
-            if (lp.ConstructionStage != 0)
-               sb.AppendLine("CS " + lp.ConstructionStage);
+            sb.Append("PROF " + Id);
+            if (MaterialId != 0)
+               sb.Append(" MNO " + MaterialId);
 
-            sb.Append("POLY TYPE O");
-            if (lp.Type == SectionLoopType.Outer)
-            {
-               if (lp.MaterialId != 0)
-                  sb.Append(" MNO " + lp.MaterialId);
-            }
-            else
-            {
-               sb.Append(" MNO 0");
-            }
+            sb.Append(" TYPE");
+            var typeArray = SofistikProfile.Trim().Split(':');
+            foreach (var typeString in typeArray)
+               sb.Append(" " + typeString.Trim());
+
+            sb.Append(" YM " + (-1 * SofistikProfileReference.X * unitFactor) + " ZM " + (-1 * SofistikProfileReference.Y * unitFactor));
+
+            foreach (var userText in UserText)
+               sb.Append(" " + userText);
+
+            sb.AppendLine();
+         }
+         else
+         {
+            // write section
+            sb.Append("SECT " + Id);
+            if (MaterialId != 0)
+               sb.Append(" MNO " + MaterialId);
+            sb.Append(" TITL '" + Name + "'");
+            foreach (var userText in UserText)
+               sb.Append(" " + userText);
             sb.AppendLine();
 
-            foreach (var index in lp)
-            {
-               if (index > -1 && index < Points.Count)
-                  appendPointDefinition(sb, Points[index], unitFactor);
-            }
             sb.AppendLine();
+
+            foreach (var pt in Points)
+            {
+               if (pt.Type == SectionPointType.StressPoint)
+               {
+                  appendPointDefinition(sb, pt, unitFactor);
+               }
+            }
+
+            sb.AppendLine();
+
+            var lpList = new List<SectionLoop>(Loops);
+            lpList.Sort(SectionLoop.StageComparison);
+            foreach (var lp in lpList)
+            {
+               appendLoopDefinition(sb, lp, unitFactor);
+               sb.AppendLine();
+            }
          }
 
          sb.AppendLine();
@@ -396,19 +522,64 @@ namespace gh_sofistik.Section
          return (GH_RuntimeMessageLevel.Blank, "");
       }
 
+      private void appendLoopDefinition(StringBuilder sb, SectionLoop lp, double uFac)
+      {
+         if (lp.ConstructionStage != 0)
+            sb.AppendLine("CS " + lp.ConstructionStage);
+
+         sb.Append("POLY TYPE O");
+         if (lp.Type == SectionLoopType.Outer)
+         {
+            if (lp.MaterialId != 0)
+               sb.Append(" MNO " + lp.MaterialId);
+         }
+         else
+         {
+            sb.Append(" MNO 0");
+         }
+         sb.AppendLine();
+
+         foreach (var index in lp)
+         {
+            if (index > -1 && index < Points.Count)
+               appendPointDefinition(sb, Points[index], uFac);
+         }
+      }
+
       private static void appendPointDefinition(StringBuilder sb, SectionPoint pt, double uFac)
       {
          if (pt != null)
-            sb.AppendLine("VERT " + pt.Id + " " + pt.Y * uFac + " " + pt.Z * uFac);
+         {
+            if (pt.Type == SectionPointType.StressPoint)
+            {
+               sb.Append("SPT " + pt.Id + " " + pt.Y * uFac + " " + pt.Z * uFac + " MNO 0");
+            }
+            else
+            {
+               sb.Append("VERT " + pt.Id + " " + pt.Y * uFac + " " + pt.Z * uFac);
+               if (pt.EType == EdgeTransitionType.Fillet && pt.EdgeTransitionValue1 > 1.0E-8)
+               {
+                  sb.Append(" R " + pt.EdgeTransitionValue1 * uFac + " TYPE TP");
+               }
+               if (pt.EType == EdgeTransitionType.Chamfer && pt.EdgeTransitionValue1 > 1.0E-8)
+               {
+                  sb.Append(" R " + (-1.0 * pt.EdgeTransitionValue1 * uFac) + " TYPE TP");
+               }
+            }
+            sb.AppendLine();
+         }
       }
 
    }
 
    public class SectionAttributes
    {
-      public int Id { get; set; } = 0;
-      public string Name { get; set; } = "";
-      public int MaterialId { get; set; } = 0;
+      public int? Id { get; set; }
+      public string Name { get; set; }
+      public int? MaterialId { get; set; }
+      public string ReferencePoint { get; set; }
+      public List<string> UserText { get; set; } = new List<string>();
+      public List<SectionAttributesLoop> LoopAttributes { get; set; } = new List<SectionAttributesLoop>();
 
       public SectionAttributes Duplicate()
       {
@@ -416,8 +587,149 @@ namespace gh_sofistik.Section
          {
             Id = Id,
             Name = Name,
-            MaterialId = MaterialId,
+            MaterialId = MaterialId,            
+            ReferencePoint = ReferencePoint,
          };
+         foreach (var ut in UserText)
+            res.UserText.Add(ut);
+         foreach (var lpAttr in LoopAttributes)
+            res.LoopAttributes.Add(lpAttr.Duplicate());
+         return res;
+      }
+
+      public override string ToString()
+      {
+         var res = "";
+         bool hasEntry = false;
+         if (Id.HasValue)
+         {
+            res += "Id: " + Id;
+            hasEntry = true;
+         }
+         if (!string.IsNullOrEmpty(Name))
+         {
+            if (hasEntry)
+               res += ", ";
+            res += "Name: " + Name;
+            hasEntry = true;
+         }
+         if (MaterialId.HasValue)
+         {
+            if (hasEntry)
+               res += ", ";
+            res += "Material: " + MaterialId;
+            hasEntry = true;
+         }
+         if (!string.IsNullOrEmpty(ReferencePoint))
+         {
+            if (hasEntry)
+               res += ", ";
+            res += "ReferencePoint: " + ReferencePoint;
+            hasEntry = true;
+         }
+
+         return res;
+      }
+
+      public List<(GH_RuntimeMessageLevel, string)> SetAttributes(Section section)
+      {
+         var res = new List<(GH_RuntimeMessageLevel, string)>();
+
+         if (Id != null)
+            section.Id = Id.Value;
+         if (!string.IsNullOrEmpty(Name))
+            section.Name = Name;
+         if (MaterialId != null)
+            section.MaterialId = MaterialId.Value;
+
+         var setRefPointRes = section.SetReferencePoint(ReferencePoint);
+         if (setRefPointRes.Item1 != GH_RuntimeMessageLevel.Blank)
+            res.Add(setRefPointRes);
+
+         if (UserText.Any())
+         {
+            section.UserText.Clear();
+            foreach (var ut in UserText)
+               section.UserText.Add(ut);
+         }
+
+         foreach(var lpAttr in LoopAttributes)
+            res.AddRange(lpAttr.SetAttributes(section));
+
+         return res;
+      }
+   }
+
+   public class SectionAttributesLoop
+   {
+      public string Id { get; set; }
+      public int? MaterialId { get; set; }
+      public int? ConstructionStage { get; set; }
+
+      public SectionAttributesLoop Duplicate()
+      {
+         var res = new SectionAttributesLoop()
+         {
+            Id = Id,
+            MaterialId = MaterialId,
+            ConstructionStage = ConstructionStage,
+         };
+         return res;
+      }
+
+      public override string ToString()
+      {
+         var res = "";
+         res += "Loop Id: " + Id;
+         if (MaterialId.HasValue)
+            res += ", Material: " + MaterialId;
+         if (ConstructionStage.HasValue)
+            res += ", ConstructionStage: " + ConstructionStage;
+         return res;
+      }
+
+      public List<(GH_RuntimeMessageLevel, string)> SetAttributes(Section section)
+      {
+         var res = new List<(GH_RuntimeMessageLevel, string)>();
+
+         SectionLoop loop = null;
+
+         if (section.Loops.Count == 0)
+         {
+            res.Add((GH_RuntimeMessageLevel.Warning, "Section has no loops"));
+         }
+         else if (section.Loops.Count == 1)
+         {
+            loop = section.Loops.First();
+         }
+         else
+         {
+            if (string.IsNullOrWhiteSpace(Id))
+            {
+               res.Add((GH_RuntimeMessageLevel.Warning, "Section has more than one loop, but no loop id is specified for LoopAttribute: Please specify Id for LoopAttribute"));
+            }
+            else
+            {
+               var loops = section.Loops.Where(e => e.Id.ToLower() == Id.ToLower());
+               if (loops.Any())
+               {
+                  loop = loops.First();
+               }
+               else
+               {
+                  res.Add((GH_RuntimeMessageLevel.Warning, "Loop with id: " + Id + " is not available"));
+               }
+            }
+         }
+
+         if (loop != null)
+         {
+            if (MaterialId != null)
+               loop.MaterialId = MaterialId.Value;
+            if (ConstructionStage != null)
+               loop.ConstructionStage = ConstructionStage.Value;
+         }
+
          return res;
       }
    }
@@ -457,6 +769,12 @@ namespace gh_sofistik.Section
             target = (Q)(object)id;
             return true;
          }
+         else if (typeof(Q).IsAssignableFrom(typeof(GH_Number)))
+         {
+            var id = new GH_Number(Value.Id);
+            target = (Q)(object)id;
+            return true;
+         }
          else
             return base.CastTo(ref target);
       }
@@ -472,16 +790,31 @@ namespace gh_sofistik.Section
 
       public override IGH_Goo Duplicate()
       {
-         var res = new GH_SectionAttributes()
-         {
-            Value = Value.Duplicate(),
-         };
-         return res;
+         return new GH_SectionAttributes() { Value = Value.Duplicate() };
       }
 
       public override string ToString()
       {
-         return "Id: " + Value.Id + ", Name: " + Value.Name + ", Material: " + Value.MaterialId;
+         return Value.ToString();
+      }
+   }
+
+   public class GH_SectionAttributesLoop : GH_Goo<SectionAttributesLoop>
+   {
+      public override bool IsValid => Value != null;
+
+      public override string TypeName => "GH_SectionAttributesLoop";
+
+      public override string TypeDescription => "GH_SectionAttributesLoop";
+
+      public override IGH_Goo Duplicate()
+      {
+         return new GH_SectionAttributesLoop() { Value = Value.Duplicate() };
+      }
+
+      public override string ToString()
+      {
+         return Value.ToString();
       }
    }
 
@@ -514,45 +847,109 @@ namespace gh_sofistik.Section
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddIntegerParameter("Section Id", "Id", "Id of Section", GH_ParamAccess.list, 1);
-         pManager.AddTextParameter("Section Name", "Name", "Name of Section", GH_ParamAccess.list, "New Section");
-         pManager.AddIntegerParameter("Material", "Material", "Material Number", GH_ParamAccess.list, 1);
+         pManager.AddIntegerParameter("Section Id", "Id", "Id of Section", GH_ParamAccess.item);
+         pManager.AddTextParameter("Section Name", "Name", "Name of Section", GH_ParamAccess.item);
+         pManager.AddIntegerParameter("Material", "Material", "Material Number", GH_ParamAccess.item);
+         pManager.AddTextParameter("Reference Point", "RefPt", "Id of section point to use as root point", GH_ParamAccess.item);
+         pManager.AddGenericParameter("Loop Attributes", "LpAttr", "SOFiSTiK Loop Attributes for Cross Sections", GH_ParamAccess.list);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed in the SECT header", GH_ParamAccess.list);
+
+         pManager[0].Optional = true;
+         pManager[1].Optional = true;
+         pManager[2].Optional = true;
+         pManager[3].Optional = true;
+         pManager[4].Optional = true;
+         pManager[5].Optional = true;
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGenericParameter("Section Attributes", "SecAttr", "SOFiSTiK Cross Section Attributes", GH_ParamAccess.list);
+         pManager.AddGenericParameter("Section Attributes", "SecAttr", "SOFiSTiK Cross Section Attributes", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess DA)
       {
-         var idList = DA.GetDataList<int>(0);
-         var nameList = DA.GetDataList<string>(1);
-         var materialIdList = DA.GetDataList<int>(2);
+         var id = DA.GetData<GH_Integer>(0);
+         var name = DA.GetData<string>(1);
+         var materialId = DA.GetData<GH_Integer>(2);
+         var referencePt = DA.GetData<string>(3);
+         var loopAttrList = DA.GetDataList<GH_SectionAttributesLoop>(4);
+         var userTextList = DA.GetDataList<string>(5);
 
-         var outList = new List<GH_SectionAttributes>();
+         var secAt = new SectionAttributes();
+         if (id != null)
+            secAt.Id = id.Value;
+         if (!string.IsNullOrWhiteSpace(name))
+            secAt.Name = name;
+         if (materialId != null)
+            secAt.MaterialId = materialId.Value;
+         if (!string.IsNullOrWhiteSpace(referencePt))
+            secAt.ReferencePoint = referencePt;
+         foreach (var lpAttr in loopAttrList)
+            secAt.LoopAttributes.Add(lpAttr.Value);
+         foreach (var userText in userTextList)
+            if (!string.IsNullOrWhiteSpace(userText))
+               secAt.UserText.Add(userText);
 
-         var count = Math.Max(idList.Count, nameList.Count);
-         count = Math.Max(count, materialIdList.Count);
+         DA.SetData(0, new GH_SectionAttributes() { Value = secAt });
+      }
+   }
 
-         for(int i = 0; i < count; i++)
+   public class GH_SectionAttributesLoop_Component : GH_Component
+   {
+      private System.Drawing.Bitmap _icon;
+
+      public GH_SectionAttributesLoop_Component()
+        : base("Loop Attributes", "LpAttr", "Defines SOFiSTiK Loop Attibutes for Cross Sections", "SOFiSTiK", "Section")
+      { }
+
+      protected override System.Drawing.Bitmap Icon
+      {
+         get
          {
-            var secAt = new SectionAttributes()
-            {
-               Id = idList.GetItemOrCountUp(i),
-               Name = nameList.GetItemOrLast(i),
-               MaterialId = materialIdList.GetItemOrLast(i),
-            };
-            var ghSecAt = new GH_SectionAttributes()
-            {
-               Value = secAt,
-            };
-            outList.Add(ghSecAt);
+            if (_icon == null)
+               _icon = Util.GetBitmap(GetType().Assembly, "section_attributes_loop_24x24.png");
+            return _icon;
          }
-
-         DA.SetDataList(0, outList);
       }
 
+      public override Guid ComponentGuid
+      {
+         get { return new Guid("4F24AF2D-7B16-4A4E-A77D-7955BBF7EDA4"); }
+      }
+
+      protected override void RegisterInputParams(GH_InputParamManager pManager)
+      {
+         pManager.AddTextParameter("Loop Id", "Lp Id", "Id of Section Loop", GH_ParamAccess.item);
+         pManager.AddIntegerParameter("Material Number", "Material", "Material Number", GH_ParamAccess.item);
+         pManager.AddIntegerParameter("Construction Stage", "Stage", "Construction Stage", GH_ParamAccess.item);
+
+         pManager[0].Optional = true;
+         pManager[1].Optional = true;
+         pManager[2].Optional = true;
+      }
+
+      protected override void RegisterOutputParams(GH_OutputParamManager pManager)
+      {
+         pManager.AddGenericParameter("Loop Attributes", "LpAttr", "SOFiSTiK Loop Attributes for Cross Sections", GH_ParamAccess.item);
+      }
+
+      protected override void SolveInstance(IGH_DataAccess DA)
+      {
+         var id = DA.GetData<string>(0);
+         var materialId = DA.GetData<GH_Integer>(1);
+         var constructionStageId = DA.GetData<GH_Integer>(2);
+
+         var secAt = new SectionAttributesLoop();
+         if (!string.IsNullOrWhiteSpace(id))
+            secAt.Id = id;
+         if (materialId != null)
+            secAt.MaterialId = materialId.Value;
+         if (constructionStageId != null)
+            secAt.ConstructionStage = constructionStageId.Value;
+
+         DA.SetData(0, new GH_SectionAttributesLoop() { Value = secAt });
+      }
    }
 
    public class GH_SectionFromBrep_Component : GH_Component
@@ -580,104 +977,254 @@ namespace gh_sofistik.Section
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddBrepParameter("Planar Brep", "Brp", "Planar Brep specifying the boundaries of the Cross Section", GH_ParamAccess.list);
-         pManager.AddPlaneParameter("Plane", "Pln", "Construction Plane for this Section", GH_ParamAccess.list, Plane.WorldYZ);
-         pManager.AddGenericParameter("Section Attributes", "SecAttr", "SOFiSTiK Cross Section Attributes", GH_ParamAccess.list);
+         pManager.AddBrepParameter("Planar Brep", "Brp", "Planar Brep specifying the boundaries of the Cross Section", GH_ParamAccess.item);
+         pManager.AddPointParameter("Additional Points", "Pts", "Additional section points for the Cross Section", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Plane/Point", "Pln/Pt", "Construction Plane for this Section or point of origin", GH_ParamAccess.item);
+         pManager.AddGenericParameter("Section Attributes", "SecAttr", "SOFiSTiK Cross Section Attributes", GH_ParamAccess.item);
 
+         pManager[1].Optional = true;
          pManager[2].Optional = true;
+         pManager[3].Optional = true;
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddGenericParameter("Section", "Sec", "SOFiSTiK Cross Section", GH_ParamAccess.list);
+         pManager.AddGenericParameter("Section", "Sec", "SOFiSTiK Cross Section", GH_ParamAccess.item);
       }
 
       protected override void SolveInstance(IGH_DataAccess DA)
       {
-         var brpList = DA.GetDataList<Brep>(0);
-         var plnList = DA.GetDataList<Plane>(1);
-         var secAttrList = DA.GetDataList<GH_SectionAttributes>(2);
+         var brp = DA.GetData<Brep>(0);
+         var ptsList = DA.GetDataList<Point3d>(1);
+         var refGeo = DA.GetData<IGH_Goo>(2);
+         var secAttrGH = DA.GetData<GH_SectionAttributes>(3);
 
-         if (secAttrList.Count == 0)
-            secAttrList.Add(new GH_SectionAttributes() { Value = new SectionAttributes(), });
+         GH_Section outSec = null;
+         
+         var pln = Plane.Unset;
 
-         var outList = new List<GH_Section>();
-
-         for (int i = 0; i < brpList.Count; i++)
+         if (refGeo != null)
          {
-            var brp = brpList.GetItemOrLast(i);
-            var pln = plnList.GetItemOrLast(i);
-
-            var sec = CreateSection(brp, pln);
-
-            var secAttr = secAttrList.GetItemOrLast(i).Value;
-
-            var id = secAttr.Id;
-            if (i >= secAttrList.Count)
-               id = id - (secAttrList.Count - 1) + i;
-
-            sec.Id = id;
-            sec.Name = secAttr.Name;
-            sec.MaterialId = secAttr.MaterialId;
-            sec.Unit = Units.Unit_Length.None;
-
-            var ghSec = new GH_Section()
+            if (refGeo is GH_Plane)
             {
-               Value = sec,
-            };
-
-            outList.Add(ghSec);
+               pln = (refGeo as GH_Plane).Value;
+            }
+            else if (refGeo is GH_Point)
+            {
+               pln = calcPlane(brp);
+               if (pln != Plane.Unset)
+               {
+                  pln.Origin = (refGeo as GH_Point).Value;
+               }
+            }
+            else
+            {
+               AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Input geometry " + refGeo.TypeName + " not supported. Please specify Plane or Point.");
+            }
          }
 
-         DA.SetDataList(0, outList);
+         if (pln == Plane.Unset)
+         {
+            pln = calcPlane(brp);
+         }
+
+         if (pln == Plane.Unset)
+         {
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Could not create reference plane.");
+         }
+         else
+         {
+            var sec = CreateSection(brp, ptsList, pln);
+
+            var secAttr = secAttrGH == null ? new SectionAttributes() : secAttrGH.Value;
+            var secAttrToAssign = new SectionAttributes()
+            {
+               Id = secAttr.Id == null ? 1 : secAttr.Id.Value,
+               Name = string.IsNullOrEmpty(secAttr.Name) ? "New Section" : secAttr.Name,
+               MaterialId = secAttr.MaterialId == null ? 1 : secAttr.MaterialId.Value,
+               ReferencePoint = secAttr.ReferencePoint,
+            };
+            foreach (var lpAttr in secAttr.LoopAttributes)
+               secAttrToAssign.LoopAttributes.Add(lpAttr.Duplicate());
+            foreach (var ut in secAttr.UserText)
+               secAttrToAssign.UserText.Add(ut);
+
+            foreach (var setSecAttrRes in secAttrToAssign.SetAttributes(sec))
+               AddRuntimeMessage(setSecAttrRes.Item1, setSecAttrRes.Item2);
+
+            sec.Unit = Units.Unit_Length.None;
+
+            outSec = new GH_Section() { Value = sec };
+         }
+
+         DA.SetData(0, outSec);
       }
 
-      public static Section CreateSection(Brep brp, Plane pln)
+      private Plane calcPlane(Brep brp)
+      {
+         var brpPts = new List<Point3d>();
+         foreach (var v in brp.Vertices)
+            brpPts.Add(v.Location);
+
+         if (Plane.FitPlaneToPoints(brpPts, out var fitPln) == PlaneFitResult.Success)
+         {
+            if (fitPln.ZAxis * Vector3d.ZAxis < 1.0E-8)
+            {
+               if (Math.Abs(fitPln.ZAxis * Vector3d.ZAxis) < 1.0E-8)
+               {
+                  if (fitPln.ZAxis * Vector3d.XAxis < 1.0E-8)
+                  {
+                     fitPln.Flip();
+                  }
+               }
+               else
+               {
+                  fitPln.Flip();
+               }
+            }
+
+            var ly = Vector3d.CrossProduct(fitPln.ZAxis, Vector3d.XAxis);
+            if (ly.IsTiny())
+            {
+               ly = Vector3d.CrossProduct(fitPln.ZAxis, Vector3d.YAxis);
+            }
+            ly.Unitize();
+            var lx = Vector3d.CrossProduct(ly, fitPln.ZAxis);
+            lx.Unitize();
+            fitPln = new Plane(fitPln.Origin, lx, ly);
+
+            var amPropOrg = AreaMassProperties.Compute(brp);
+
+            fitPln.Origin = amPropOrg.Centroid;
+
+            var tx = Transform.ChangeBasis(Plane.WorldXY, fitPln);
+
+            var brpDup = brp.DuplicateBrep();
+
+            brpDup.Transform(tx);
+
+            var amProp = AreaMassProperties.Compute(brpDup);
+
+            var iXX = amProp.WorldCoordinatesMomentsOfInertia.X;
+            var iYY = amProp.WorldCoordinatesMomentsOfInertia.Y;
+            var iXY = amProp.WorldCoordinatesProductMoments.X;
+
+            double phi = 0.5 * 0.5 * Math.PI;
+            if (Math.Abs(iXX - iYY) > 1.0E-8)
+            {
+               phi = 0.5 * Math.Atan((2 * iXY) / (iYY - iXX));
+            }
+
+            double iEta = (0.5 * (iXX + iYY)) + (0.5 * (iXX - iYY) * Math.Cos(2 * phi)) - (iXY * Math.Sin(2 * phi));
+            double iZeta = (0.5 * (iXX + iYY)) - (0.5 * (iXX - iYY) * Math.Cos(2 * phi)) + (iXY * Math.Sin(2 * phi));
+
+            if (iZeta > iEta)
+            {
+               phi += 0.5 * Math.PI;
+            }
+
+            fitPln.Rotate(phi, fitPln.ZAxis);
+
+            if (fitPln.YAxis * Vector3d.ZAxis < 0.0)
+            {
+               fitPln.Rotate(Math.PI, fitPln.ZAxis);
+            }
+
+            return fitPln;
+         }
+
+         return Plane.Unset;
+      }
+
+      public static Section CreateSection(Brep brp, List<Point3d> ptsList, Plane pln)
       {
          var sec = new Section();
-         string id = "P101";
+         string loopPtId = "P101";
+         string stressPtId = "S101";
 
          var tx = Transform.ChangeBasis(Plane.WorldYZ, Util.SofiSectionBasePlane) * Transform.ChangeBasis(Plane.WorldXY, pln);
 
          int pointIndex = 0;
-         foreach (var lp in brp.Loops)
+         int loopIndex = 0;
+         int faceIndex = 0;
+         foreach (var fc in brp.Faces)
          {
-            var crv = lp.To3dCurve();
-
-            crv.Transform(tx);
-
-            var polyLine = Util.CreatePolyLine(crv);
-            if (polyLine != null)
+            var secFace = new SectionFace()
             {
-               var secLp = new SectionLoop();
-               secLp.Type = lp.LoopType == BrepLoopType.Outer ? SectionLoopType.Outer : SectionLoopType.Inner;
-               int firstIndex = -1;
-               int i = 0;
-               foreach (var pt in polyLine)
-               {
-                  if (i < polyLine.Count - 1)
-                  {
-                     var secPt = new SectionPoint()
-                     {
-                        Id = id,
-                        EType = EdgeTransitionType.Fillet,
-                        EdgeTransitionValue1 = 0.0,
-                        EdgeTransitionValue2 = 0.0,
-                        Y = pt.Y,
-                        Z = pt.Z,
-                     };
-                     id = Util.CountStringUp(id);
+               Id = (faceIndex++).ToString(),
+            };
+            foreach (var lp in fc.Loops)
+            {
+               var crv = lp.To3dCurve();
 
-                     if (i++ == 0)
-                        firstIndex = pointIndex;
-                     secLp.Add(pointIndex++);
-                     sec.Points.Add(secPt);
+               crv.Transform(tx);
+
+               var polyLine = Util.CreatePolyLine(crv);
+               if (polyLine != null)
+               {
+                  var secLp = new SectionLoop()
+                  {
+                     Id = loopIndex.ToString(),
+                     Type = lp.LoopType == BrepLoopType.Outer ? SectionLoopType.Outer : SectionLoopType.Inner,
+                  };
+
+                  int firstIndex = -1;
+                  int i = 0;
+                  foreach (var pt in polyLine)
+                  {
+                     if (i < polyLine.Count - 1)
+                     {
+                        var secPt = new SectionPoint()
+                        {
+                           Id = loopPtId,
+                           Type = SectionPointType.PolygonPoint,
+                           EType = EdgeTransitionType.Fillet,
+                           EdgeTransitionValue1 = 0.0,
+                           EdgeTransitionValue2 = 0.0,
+                           Y = pt.Y,
+                           Z = pt.Z,
+                        };
+                        loopPtId = Util.CountStringUp(loopPtId);
+
+                        if (i++ == 0)
+                           firstIndex = pointIndex;
+
+                        sec.Points.Add(secPt);
+                        secLp.Add(pointIndex);
+                        pointIndex++;
+                     }
                   }
+                  if (firstIndex > -1)
+                     secLp.Add(firstIndex);
+
+                  sec.Loops.Add(secLp);
+
+                  if (secLp.Type == SectionLoopType.Outer)
+                     secFace.OuterLoopIdx = loopIndex;
+                  else
+                     secFace.InnerLoopIdxList.Add(loopIndex);
+
+                  loopIndex++;
                }
-               if (firstIndex > -1)
-                  secLp.Add(firstIndex);
-               sec.Loops.Add(secLp);
             }
+            sec.Faces.Add(secFace);
+         }
+
+         foreach(var pt in ptsList)
+         {
+            pt.Transform(tx);
+            var secPt = new SectionPoint()
+            {
+               Id = stressPtId,
+               Type = SectionPointType.StressPoint,
+               EType = EdgeTransitionType.Fillet,
+               EdgeTransitionValue1 = 0.0,
+               EdgeTransitionValue2 = 0.0,
+               Y = pt.Y,
+               Z = pt.Z,
+            };
+            stressPtId = Util.CountStringUp(stressPtId);
+            sec.Points.Add(secPt);
          }
 
          return sec;
@@ -685,14 +1232,42 @@ namespace gh_sofistik.Section
 
    }
 
-   public class GH_PlaceSection_Component : GH_Component
+   public class GH_ViewSection_Component : GH_Component
    {
       private System.Drawing.Bitmap _icon;
 
-      private List<(Point3d, string)> _pts = new List<(Point3d, string)>();
+      private static readonly int InfoMarginLeft = 15;
+      private static readonly int InfoMarginTop = 42;
+      private static readonly int InfoLineLength = 20;
+      private static readonly int InfoLineThickness = 3;
+      private static readonly double InfoTextHeight = 0.9;
+      private static readonly double InfoTextPadding = 0.25;
+      private static readonly System.Drawing.Color ReinforcementColor = System.Drawing.Color.Red;
+      private static readonly double BlobDistance = 50;
+      private static readonly int BlobMaxCount = 5;
 
-      public GH_PlaceSection_Component()
-         : base("Place Section", "Place Section", "View and place a SOFiSTiK Section", "SOFiSTiK", "Section")
+      private List<string> _sectionInfo = new List<string>();
+      private List<List<(Point3d, string)>> _pointsInfo = new List<List<(Point3d, string)>>();
+      private List<List<(Curve, string, System.Drawing.Color)>> _loopsInfo = new List<List<(Curve, string, System.Drawing.Color)>>();
+      private List<List<Brep>> _reinforcementsInfo = new List<List<Brep>>();
+      private Rhino.Display.DisplayMaterial _ReinforcementMaterial
+      {
+         get
+         {
+            if (_reinforcementMaterial == null)
+            {
+               _reinforcementMaterial = new Rhino.Display.DisplayMaterial();
+               _reinforcementMaterial.Shine = 0.2;
+               _reinforcementMaterial.Transparency = 0.2;
+               DrawUtil.SetMaterialColors(_reinforcementMaterial, ReinforcementColor);
+            }
+            return _reinforcementMaterial;
+         }
+      }
+      private Rhino.Display.DisplayMaterial _reinforcementMaterial;
+
+      public GH_ViewSection_Component()
+         : base("View Section", "View Section", "View and place a SOFiSTiK Section", "SOFiSTiK", "Section")
       { }
 
       protected override System.Drawing.Bitmap Icon
@@ -700,7 +1275,7 @@ namespace gh_sofistik.Section
          get
          {
             if (_icon == null)
-               _icon = Util.GetBitmap(GetType().Assembly, "section_place_24x24.png");
+               _icon = Util.GetBitmap(GetType().Assembly, "section_view_24x24.png");
             return _icon;
          }
       }
@@ -713,18 +1288,106 @@ namespace gh_sofistik.Section
       public override void DrawViewportWires(IGH_PreviewArgs args)
       {
          base.DrawViewportWires(args);
+         var textHeight = (int)(GH_FontServer.StandardAdjusted.Height * InfoTextHeight);
+         var infoGapY = (int)(textHeight * (1 + InfoTextPadding));
          if (this.Attributes.Selected)
-            foreach (var pt in _pts)
+         {
+            int idxLine = 0;
+            for (int i = 0; i < _sectionInfo.Count; i++)
             {
-               args.Display.Draw2dText(pt.Item2, System.Drawing.Color.DarkRed, pt.Item1, false, 20);
-               args.Display.DrawPoint(pt.Item1);
+               args.Display.Draw2dText(_sectionInfo[i], System.Drawing.Color.Black, new Point2d(InfoMarginLeft, InfoMarginTop - 0.5 * textHeight + infoGapY * idxLine), false, textHeight);
+               idxLine++;
+               foreach (var loopInfo in _loopsInfo[i])
+               {
+                  args.Display.DrawCurve(loopInfo.Item1, loopInfo.Item3, InfoLineThickness);
+                  args.Display.Draw2dLine(new System.Drawing.PointF(InfoMarginLeft, InfoMarginTop + infoGapY * idxLine), new System.Drawing.PointF(InfoMarginLeft + InfoLineLength, InfoMarginTop + infoGapY * idxLine), loopInfo.Item3, InfoLineThickness);
+                  args.Display.Draw2dText(loopInfo.Item2, System.Drawing.Color.Black, new Point2d(InfoMarginLeft + InfoLineLength + 10, InfoMarginTop - 0.5 * textHeight + infoGapY * idxLine), false, textHeight);
+                  idxLine++;
+               }
             }
+            foreach (var reinforcementList in _reinforcementsInfo)
+            {
+               foreach (var reinforcement in reinforcementList)
+               {
+                  args.Display.DrawCurve(reinforcement.Curves3D.First(), System.Drawing.Color.Black);
+               }
+            }
+            foreach (var pointList in _pointsInfo)
+            {
+               var blobList = new List<(Point2d, List<Point2d>, List<string>)>();
+               foreach (var pointInfo in pointList)
+               {
+                  if (args.Viewport.IsVisible(pointInfo.Item1))
+                  {
+                     var pt2d = args.Viewport.WorldToClient(pointInfo.Item1);
+                     int idxBlob = -1;
+                     for (int i = 0; i < blobList.Count; i++)
+                     {
+                        if (blobList[i].Item1.DistanceTo(pt2d) < BlobDistance)
+                        {
+                           idxBlob = i;
+                           break;
+                        }
+                     }
+                     if (idxBlob == -1)
+                     {
+                        blobList.Add((pt2d, new List<Point2d>() { pt2d }, new List<string>() { pointInfo.Item2 }));
+                     }
+                     else
+                     {
+                        var blob = blobList[idxBlob];
+                        var bpList = blob.Item2;
+                        var bsList = blob.Item3;
+                        bpList.Add(pt2d);
+                        var pCent = bpList.First();
+                        for (int i = 1; i < bpList.Count; i++)
+                           pCent += bpList[i];
+                        pCent *= 1.0 / bpList.Count;
+                        bsList.Add(pointInfo.Item2);
+                        blobList[idxBlob] = (pCent, bpList, bsList);
+                     }
+                  }
+               }
+               foreach (var blob in blobList)
+               {
+                  var text = blob.Item3.First();
+                  for (int i = 1; i < blob.Item3.Count && i < BlobMaxCount; i++)
+                     text += "\n" + blob.Item3[i];
+                  if (blob.Item3.Count > BlobMaxCount)
+                     text += "\n...";
+                  args.Display.DrawDot((float)blob.Item1.X + 25, (float)blob.Item1.Y, text, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+               }
+               foreach (var pointInfo in pointList)
+               {
+                  // args.Display.Draw2dText(text, System.Drawing.Color.DarkRed, ptTuple.Item1, false, 20);
+                  //var pt2d = args.Viewport.WorldToClient(pointInfo.Item1);
+                  //pt2d.X += 25;
+                  //args.Display.DrawDot((float)pt2d.X, (float)pt2d.Y, pointInfo.Item2, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+                  args.Display.DrawPoint(pointInfo.Item1);
+               }
+            }
+         }
+      }
+
+      public override void DrawViewportMeshes(IGH_PreviewArgs args)
+      {
+         base.DrawViewportMeshes(args);
+         if (this.Attributes.Selected)
+         {
+            foreach (var reinforcementList in _reinforcementsInfo)
+            {
+               foreach (var reinforcement in reinforcementList)
+               {
+                  args.Display.DrawBrepShaded(reinforcement, _ReinforcementMaterial);
+               }
+            }
+         }
       }
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGenericParameter("Section", "Sec", "SOFiSTiK Section", GH_ParamAccess.list);
-         pManager.AddPlaneParameter("Reference Plane", "Pln", "Reference Plane for placing and displaying Section", GH_ParamAccess.list, Plane.WorldYZ);
+         pManager.AddGenericParameter("Section", "Sec", "SOFiSTiK Section", GH_ParamAccess.item);
+         pManager.AddPlaneParameter("Reference Plane", "Pln", "Reference Plane for placing and displaying Section", GH_ParamAccess.item, Plane.WorldYZ);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -734,41 +1397,92 @@ namespace gh_sofistik.Section
 
       protected override void SolveInstance(IGH_DataAccess DA)
       {
-         var secList = DA.GetDataList<GH_Section>(0);
-         var plnList = DA.GetDataList<GH_Plane>(1);
+         var ghSec = DA.GetData<GH_Section>(0);
+         var ghPln = DA.GetData<GH_Plane>(1);
 
          var outListBrp = new List<GH_Brep>();
 
          double tolerance = Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
 
-         _pts.Clear();
-
-         for (int i = 0; i < secList.Count; i++)
+         if (RunCount == 1)
          {
-            var sec = secList.GetItemOrLast(i).Value.Duplicate();
-            var pln = plnList.GetItemOrLast(i).Value;
+            _sectionInfo.Clear();
+            _pointsInfo.Clear();
+            _loopsInfo.Clear();
+            _reinforcementsInfo.Clear();
+         }
 
+         var sec = ghSec?.Value?.Duplicate();
+         var pln = Plane.Unset;
+         if (ghPln != null)
+            pln = ghPln.Value;
+         if (sec != null && pln!=Plane.Unset)
+         {
             Transform tx = Transform.PlaneToPlane(Plane.WorldYZ, pln) * Transform.ChangeBasis(Plane.WorldXY, Util.SofiSectionBasePlane);
 
-            var brps = Brep.CreatePlanarBreps(sec.GetBounds(), tolerance);
-            if (brps == null || brps.Length == 0)
-               AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Could not create Planar Brep");
-            else
+            var secGeo = sec.Get3DBounds();
+            foreach (var face in secGeo)
             {
-               foreach (var brp in brps)
+               var brps = Brep.CreatePlanarBreps(face, tolerance);
+               if (brps == null || brps.Length == 0)
+                  AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Could not create Planar Brep");
+               else
                {
-                  brp.Transform(tx);
-                  outListBrp.Add(new GH_Brep(brp));
+                  foreach (var brp in brps)
+                  {
+                     brp.Transform(tx);
+                     outListBrp.Add(new GH_Brep(brp));
+                  }
                }
             }
 
-            foreach (var kvp in sec.GetPoints())
+            // prepare section for visualization
+            _sectionInfo.Add("Id: " + sec.Id.ToString() + " - Name: " + sec.Name + " - Unit: " + sec.Unit.ToString() + " - Material: " + sec.MaterialId.ToString() + " - Faces: " + sec.Faces.Count.ToString() + " - Loops: " + sec.Loops.Count.ToString() + " - Points: " + sec.Points.Count.ToString());
+
+            // prepare points for visualization
+            var ptInfoList = new List<(Point3d, string)>();
+            foreach (var kvp in sec.Get3DPoints())
             {
                var p = kvp.Value;
                p.Transform(tx);
-               _pts.Add((p, kvp.Key));
+               ptInfoList.Add((p, kvp.Key));
             }
+            _pointsInfo.Add(ptInfoList);
 
+            // prepare loops for visualization
+            var lpList = new List<(Curve, string, System.Drawing.Color)>();
+            var lps3d = sec.Get3DBounds();
+            var dPhi = 360 / sec.Loops.Count;
+            var phi = 255;
+            for (int idxFace = 0; idxFace < sec.Faces.Count; idxFace++)
+            {
+               var secFace = sec.Faces[idxFace];
+               var secFace3d = lps3d[idxFace];
+               for (int idxLoop = 0; idxLoop < secFace3d.Count; idxLoop++)
+               {
+                  var secLoop = sec.Loops[idxLoop == 0 ? secFace.OuterLoopIdx : secFace.InnerLoopIdxList[idxLoop - 1]];
+                  var secLoop3d = secFace3d[idxLoop];
+                  secLoop3d.Transform(tx);
+                  var text = "Id: " + secLoop.Id + (secLoop.MaterialId != 0 ? " - Material: " + secLoop.MaterialId.ToString() : "") + (secLoop.ConstructionStage != 0 ? " - ConstructionStage: " + secLoop.ConstructionStage.ToString() : "");
+                  lpList.Add((secLoop3d, text, DrawUtil.HsvToColor(phi, 1, 1)));
+                  phi += dPhi;
+               }
+            }
+            _loopsInfo.Add(lpList);
+
+            // prepare reinforcements for visualization
+            var reinforcementList = new List<Brep>();
+            foreach (var circ in sec.Get3DReinforcements())
+            {
+               var breps = Brep.CreatePlanarBreps(circ, Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+               if (breps.Any())
+               {
+                  var brep = breps.First();
+                  brep.Transform(tx);
+                  reinforcementList.Add(brep);
+               }
+            }
+            _reinforcementsInfo.Add(reinforcementList);
          }
 
          DA.SetDataList(0, outListBrp);

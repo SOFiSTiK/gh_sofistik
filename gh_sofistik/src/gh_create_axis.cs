@@ -51,31 +51,41 @@ namespace gh_sofistik.Geometry
          var definitions = new List<string>();
          var lengths = new List<double>();
 
+         var tU = Units.UnitHelper.GetUnitTransformToMeters();
+         bool scaleUnit = Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem != Rhino.UnitSystem.Meters;
+
+         int count = Math.Max(curves.Count, names.Count);
+
          // over all curves passed in
-         for(int ic = 0; ic<curves.Count; ++ic)
+         for (int i = 0; i < count; ++i)
          {
-            var c = curves[ic];
+            var crv = curves.GetItemOrLast(i).DuplicateCurve();
+            var name = names.GetItemOrLast(i)?.Trim().ToUpper();
+            var type = types.GetItemOrLast(i);
+
+            // scale if neccessary
+            var lengthRhino = crv.GetLength();
+            if (scaleUnit)
+               crv.Transform(tU);
 
             // identifier
-            string name = names.GetItemOrLast(1)?.Trim().ToUpper();
-            if(string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
-               name = "G_" + (ic + 1).ToString();
+               name = "G_" + (i + 1).ToString();
             }
-            else if(names.Count != curves.Count && ic >= names.Count - 1)
+            else if (names.Count < curves.Count && i >= names.Count - 1)
             {
-               name = name + (ic + 1).ToString();
+               name = name + (i + 1).ToString();
             }
             if (name.Length > 4)
                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Generated Identifier of Curve exceeds maximum allowed length of 4 characters");
 
             // type
-            string type = types.GetItemOrLast(ic);
             if (string.IsNullOrWhiteSpace(type))
                type = "LANE";
 
-            definitions.Add(GetGeometryAxisDefinition(c, name, type));
-            lengths.Add(c.GetLength());
+            definitions.Add(GetGeometryAxisDefinition(crv, name, type));
+            lengths.Add(lengthRhino);
          }
 
          da.SetDataList(0, definitions);
@@ -127,8 +137,8 @@ namespace gh_sofistik.Geometry
          Point3d pa = c.PointAtStart;
          Point3d pe = c.PointAtEnd;
 
-         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, c.Domain.T0);
-         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, c.Domain.T1);
+         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, c.Domain.Min);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, c.Domain.Max);
          sb.AppendLine();
       }
 
@@ -139,8 +149,8 @@ namespace gh_sofistik.Geometry
          Point3d pm = ar.Arc.Center;
          Vector3d n = ar.Arc.Plane.Normal;
 
-         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, ar.Domain.T0);
-         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, ar.Domain.T1);
+         sb.AppendFormat(" GAXB X1 {0:F8} {1:F8} {2:F8} S1 {3:F8} ", pa.X, pa.Y, pa.Z, ar.Domain.Min);
+         sb.AppendFormat(" X2 {0:F8} {1:F8} {2:F8} S2 {3:F8} ", pe.X, pe.Y, pe.Z, ar.Domain.Max);
          sb.AppendFormat(" XM {0:F8} {1:F8} {2:F8} ", pm.X, pm.Y, pm.Z);
          sb.AppendFormat(" NX {0:F8} {1:F8} {2:F8} ", n.X, n.Y, n.Z);
          sb.AppendLine();
@@ -148,20 +158,9 @@ namespace gh_sofistik.Geometry
 
       private static void AppendNurbsDefinition(StringBuilder sb, NurbsCurve nb)
       {
-         double l = nb.GetLength();
-         double k0 = nb.Knots[0];
-         double kn = nb.Knots[nb.Knots.Count-1];
-
-         // re-parametrize knot vectors to length of curve
-         double scale = 1.0;
-         if (Math.Abs(kn - k0) > 1.0E-6)
-            scale = l / (kn - k0);
-
          for (int i = 0; i < nb.Knots.Count; ++i)
          {
-            double si = (nb.Knots[i] - k0) * scale;
-
-            sb.AppendFormat(" GAXN S {0:F8}", si);
+            sb.AppendFormat(" GAXN S {0:F8}", nb.Knots[i]);
             sb.AppendLine();
          }
 

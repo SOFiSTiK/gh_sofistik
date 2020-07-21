@@ -39,7 +39,7 @@ namespace gh_sofistik.Structure
 
       private SupportCondition _supp_condition = null;
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
-      private Point3d _drawGroupIdLocation = Point3d.Unset;
+      private InfoPanel _infoPanel;
 
       public override BoundingBox Boundingbox
       {
@@ -99,7 +99,12 @@ namespace gh_sofistik.Structure
       public override IGH_GeometricGoo Transform(Transform xform)
       {
          var dup = this.DuplicateGeometry() as GS_StructuralLine;
+
          dup.Value.Transform(xform);
+
+         var localVZ = dup.DirectionLocalZ;
+         localVZ.Transform(xform);
+         dup.DirectionLocalZ = localVZ;
 
          return dup;
       }
@@ -131,8 +136,7 @@ namespace gh_sofistik.Structure
             else
             {
                drawLocalFrame(args.Pipeline);
-               if (DrawUtil.DrawInfo && GroupId > 0)
-                  drawGroupId(args);
+               drawInfoPanel(args.Pipeline, args.Viewport);
             }
 
             args.Pipeline.DrawCurve(Value, colStr, args.Thickness+1);
@@ -150,22 +154,30 @@ namespace gh_sofistik.Structure
          }
       }
 
-      private void drawGroupId(GH_PreviewWireArgs args)
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
       {
-         double midOffset = 20;
-
-         if (_drawGroupIdLocation == Point3d.Unset)
-            _drawGroupIdLocation = Value.PointAtNormalizedLength(0.5);
-         var midPoint2d = args.Viewport.WorldToClient(_drawGroupIdLocation);
-         midPoint2d.X -= midOffset;
-         args.Pipeline.DrawDot((float)midPoint2d.X, (float)midPoint2d.Y, "Grp: " + GroupId, DrawUtil.DrawColorInfoDotBack, DrawUtil.DrawColorInfoDotText);
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               _infoPanel.Positions.Add(Value.PointAtNormalizedLength(0.5));
+               if (Id != 0)
+                  _infoPanel.Content.Add("Id: " + Id);
+               if (GroupId != 0)
+                  _infoPanel.Content.Add("Grp: " + GroupId);
+               if (SectionIdStart != 0)
+                  _infoPanel.Content.Add("Sec: " + SectionIdStart + (SectionIdEnd == 0 || SectionIdStart == SectionIdEnd ? "" : "." + SectionIdEnd));
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
       }
 
       private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
       {
          if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
          {
-            if (!_localFrame.isValid)
+            if (!_localFrame.IsValid)
             {
                updateLocalFrameTransforms();
             }
@@ -199,7 +211,7 @@ namespace gh_sofistik.Structure
       {
          if (DrawUtil.ScaleFactorSupports > 0.0001 && _supp_condition.HasSupport)
          {
-            if (!_supp_condition.isValid)
+            if (!_supp_condition.IsValid)
             {
                updateSupportTransforms();
             }
@@ -222,43 +234,48 @@ namespace gh_sofistik.Structure
          {
             var att = baking_attributes.Duplicate();
 
-            var str_id = this.Id > 0 ? Id.ToString() : "0"; // string.Empty;
-
-            string fix_literal = this.FixLiteral
-               .Replace("PP", "PXPYPZ")
-               .Replace("MM", "MXMYMZ");
-
-            if (fix_literal == "F")
-               fix_literal = "PXPYPZMXMYMZ";
-
             // set user strings
             att.SetUserString("SOF_OBJ_TYPE", "SLN");
-            att.SetUserString("SOF_ID", str_id);
+            att.SetUserString("SOF_ID", Math.Max(0,Id).ToString());
 
-            if(this.GroupId > 0)
-               att.SetUserString("SOF_GRP", this.GroupId.ToString());
-            if(this.SectionIdStart > 0)
+            if(GroupId > 0)
+               att.SetUserString("SOF_GRP", GroupId.ToString());
+            if(SectionIdStart > 0)
             {
-               att.SetUserString("SOF_STYP", "B");
+               att.SetUserString("SOF_STYP",ElementType);
                att.SetUserString("SOF_STYP2", "E");
                att.SetUserString("SOF_SNO", SectionIdStart.ToString());
 
-               if(this.SectionIdEnd > 0)
+               if(SectionIdEnd > 0)
                   att.SetUserString("SOF_SNOE", SectionIdEnd.ToString());
                else
                   att.SetUserString("SOF_SNOE", "SOF_PROP_COMBO_NONE");
             }
-            att.SetUserString("SOF_SDIV", "0.0");
+
+            if(ElementSize != 0.0)
+               att.SetUserString("SOF_SDIV", ElementSize.ToString());
 
             if(DirectionLocalZ.Length > 1.0E-6)
             {
-               att.SetUserString("SOF_DRX", DirectionLocalZ.X.ToString("F6"));
-               att.SetUserString("SOF_DRY", DirectionLocalZ.Y.ToString("F6"));
-               att.SetUserString("SOF_DRZ", DirectionLocalZ.Z.ToString("F6"));
+               var dir_z = DirectionLocalZ; dir_z.Unitize();
+
+               att.SetUserString("SOF_DRX", dir_z.X.ToString("F6"));
+               att.SetUserString("SOF_DRY", dir_z.Y.ToString("F6"));
+               att.SetUserString("SOF_DRZ", dir_z.Z.ToString("F6"));
             }
 
-            if (string.IsNullOrEmpty(fix_literal) == false)
+            if (string.IsNullOrWhiteSpace(fixLiteral) == false)
+            {
+               string fix_literal = FixLiteral.Replace("PP", "PXPYPZ").Replace("MM", "MXMYMZ");
+
+               if (fix_literal == "F")
+                  fix_literal = "PXPYPZMXMYMZ";
+
                att.SetUserString("SOF_FIX", fix_literal);
+            }
+
+            if (string.IsNullOrWhiteSpace(UserText) == false)
+               att.SetUserString("SOF_USERTXT", UserText);
 
             obj_guid = doc.Objects.AddCurve(Value, att);
          }
@@ -294,12 +311,14 @@ namespace gh_sofistik.Structure
          pManager.AddCurveParameter("Curve", "Crv", "Curve Geometry", GH_ParamAccess.list);
          pManager.AddIntegerParameter("Number", "Number", "Identifier of structural line", GH_ParamAccess.list, 0);
          pManager.AddIntegerParameter("Group", "Group", "Group number of structural line", GH_ParamAccess.list, 0);
-         pManager.AddTextParameter("Section", "Section", "Identifier of cross section or start and end section separated by '.' (e.g. '1.2')", GH_ParamAccess.list, string.Empty);
+         pManager.AddGenericParameter("Section", "Section", "Section, Identifier of cross section or start and end section separated by '.' (e.g. '1.2')", GH_ParamAccess.list);
          pManager.AddVectorParameter("Dir Z", "Dir z", "Direction of local z-axis", GH_ParamAccess.list, new Vector3d());
          pManager.AddTextParameter("Fixation", "Fixation", "Support condition literal", GH_ParamAccess.list, string.Empty);
          pManager.AddTextParameter("Element Type", "Element Type", "Element Type of this structural line (Beam = default, Truss, Cable)", GH_ParamAccess.list, "Beam");
          pManager.AddNumberParameter("Element Size", "Element Size", "Size of FE elements [m]", GH_ParamAccess.list, 0.0);
          pManager.AddTextParameter("User Text", "User Text", "Custom User Text to be passed to the SOFiSTiK input", GH_ParamAccess.list, string.Empty);
+
+         pManager[3].Optional = true;
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -312,7 +331,7 @@ namespace gh_sofistik.Structure
          var curves = da.GetDataList<Curve>(0);
          var identifiers = da.GetDataList<int>(1);
          var groups = da.GetDataList<int>(2);
-         var sections = da.GetDataList<string>(3);
+         var sections = da.GetDataList<IGH_Goo>(3);
          var zdirs = da.GetDataList<Vector3d>(4);
          var fixations = da.GetDataList<string>(5);
          var elementType = da.GetDataList<string>(6);
@@ -327,7 +346,29 @@ namespace gh_sofistik.Structure
 
             if (!(c is null))
             {
-               var section_ids = Util.ParseSectionIdentifier(sections.GetItemOrLast(i));
+               var section_ids = new Tuple<int, int>(0, 0);
+               var sectionGoo = sections.GetItemOrLast(i);
+               if (sectionGoo != null)
+               {
+                  if (sectionGoo is GH_String)
+                  {
+                     var sectionIdString = (sectionGoo as GH_String).Value;
+                     section_ids = Util.ParseSectionIdentifier(sectionIdString);
+                  }
+                  else
+                  {
+                     var sectionId = 0;
+                     if (sectionGoo is Section.GH_Section)
+                        sectionId = (sectionGoo as Section.GH_Section).Value.Id;
+                     else if (sectionGoo is GH_Integer)
+                        sectionId = (sectionGoo as GH_Integer).Value;
+                     else if (sectionGoo is GH_Number)
+                        sectionId = (int)(sectionGoo as GH_Number).Value;
+                     else
+                        AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Could not extract section id from type " + sectionGoo.TypeName);
+                     section_ids = new Tuple<int, int>(sectionId, sectionId);
+                  }
+               }
 
                var gc = new GS_StructuralLine()
                {

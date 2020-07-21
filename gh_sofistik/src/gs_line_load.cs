@@ -15,7 +15,8 @@ namespace gh_sofistik.Load
       public Vector3d Moments { get; set; } = new Vector3d();
 
       private LoadCondition _loadCondition = new LoadCondition();
-      
+      private InfoPanel _infoPanel;
+
       public GS_StructuralLine ReferenceLine { get; set; }
 
       public override string TypeName
@@ -91,7 +92,14 @@ namespace gh_sofistik.Load
          {
             System.Drawing.Color col = args.Color;
             if (!DrawUtil.CheckSelection(col))
+            {
                col = DrawUtil.DrawColorLoads;
+            }
+            else
+            {
+               drawInfoPanel(args.Pipeline, args.Viewport);
+            }
+
             args.Pipeline.DrawCurve(Value, DrawUtil.DrawColorLoads, args.Thickness+1);
 
             if ( DrawUtil.ScaleFactorLoads > 0.0001 && !(Forces.IsTiny() && Moments.IsTiny()) )
@@ -105,6 +113,25 @@ namespace gh_sofistik.Load
          }
       }
 
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               _infoPanel.Positions.Add(Value.PointAtNormalizedLength(0.5));
+
+               _infoPanel.Content.Add("LC: " + LoadCase);
+               if (!Forces.IsTiny())
+                  _infoPanel.Content.Add("Force: " + Forces.Length);
+               if (!Moments.IsTiny())
+                  _infoPanel.Content.Add("Moment: " + Moments.Length);
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
+      }
+
       private void updateLoadTransforms()
       {
          _loadCondition = new LoadCondition(Forces, Moments);
@@ -112,9 +139,7 @@ namespace gh_sofistik.Load
          if (!(ReferenceLine is null))
          {
             if (!ReferenceLine.DirectionLocalZ.IsTiny())
-            {
                lz = ReferenceLine.DirectionLocalZ;
-            }
          }
          _loadCondition.Transforms.AddRange(DrawUtil.GetCurveTransforms(Value, UseHostLocal, lz, null, DrawUtil.ScaleFactorLoads, DrawUtil.DensityFactorLoads));
       }
@@ -147,8 +172,8 @@ namespace gh_sofistik.Load
       {
          pManager.AddGeometryParameter("Hosting Curve / Sln", "Crv / Sln", "Hosting Curve / SOFiSTiK Structural Line", GH_ParamAccess.list);
          pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
-         pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
-         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Force", "Force", "Acting Force [kN/m]", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment [kNm/m]", GH_ParamAccess.list, new Vector3d());
          pManager.AddBooleanParameter("HostLocal", "HostLocal", "Use local coordinate system of host", GH_ParamAccess.list, false);
       }
 

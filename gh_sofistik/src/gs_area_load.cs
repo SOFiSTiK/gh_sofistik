@@ -15,6 +15,7 @@ namespace gh_sofistik.Load
       public Vector3d Moments { get; set; } = new Vector3d();
 
       private LoadCondition _loadCondition = new LoadCondition();
+      private InfoPanel _infoPanel;
 
       public GS_StructuralArea ReferenceArea { get; set; }
 
@@ -93,7 +94,14 @@ namespace gh_sofistik.Load
          {
             System.Drawing.Color col = args.Color;
             if (!DrawUtil.CheckSelection(col))
+            {
                col = DrawUtil.DrawColorLoads;
+            }
+            else
+            {
+               drawInfoPanel(args.Pipeline, args.Viewport);
+            }
+
             args.Pipeline.DrawBrepWires(Value, col, -1);
 
             if (DrawUtil.ScaleFactorLoads > 0.0001 && !(Forces.IsTiny() && Moments.IsTiny()))
@@ -104,6 +112,26 @@ namespace gh_sofistik.Load
                }
                _loadCondition.Draw(args.Pipeline, col);
             }
+         }
+      }
+
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               var amp = AreaMassProperties.Compute(Value);
+               _infoPanel.Positions.Add(Value.ClosestPoint(amp.Centroid));
+
+               _infoPanel.Content.Add("LC: " + LoadCase);
+               if (!Forces.IsTiny())
+                  _infoPanel.Content.Add("Force: " + Forces.Length);
+               if (!Moments.IsTiny())
+                  _infoPanel.Content.Add("Moment: " + Moments.Length);
+            }
+            _infoPanel.Draw(pipeline, viewport);
          }
       }
 
@@ -135,21 +163,12 @@ namespace gh_sofistik.Load
 
       public void DrawViewportMeshes(GH_PreviewMeshArgs args)
       {
+         /*
          if (!(Value is null))
          {
-            Rhino.Display.DisplayMaterial areaLoadMaterial = new Rhino.Display.DisplayMaterial(args.Material);
-
-            System.Drawing.Color col = DrawUtil.DrawColorLoads;
-
-            areaLoadMaterial.Diffuse = col;
-            areaLoadMaterial.Specular = col;
-            areaLoadMaterial.Emission = col;
-            areaLoadMaterial.BackDiffuse = col;
-            areaLoadMaterial.BackSpecular = col;
-            areaLoadMaterial.BackEmission = col;
-
-            args.Pipeline.DrawBrepShaded(Value, areaLoadMaterial);
+            args.Pipeline.DrawBrepShaded(Value, DrawUtil.DrawMaterialLoads);
          }
+         */
       }
    }
 
@@ -175,8 +194,8 @@ namespace gh_sofistik.Load
       {
          pManager.AddGeometryParameter("Hosting Brep / Sar", "Brp / Sar", "Hosting Brep / SOFiSTiK Structural Area", GH_ParamAccess.list);
          pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
-         pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
-         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Force", "Force", "Acting Force [kN/m^2]", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment [kNm/m^2]", GH_ParamAccess.list, new Vector3d());
          pManager.AddBooleanParameter("HostLocal", "HostLocal", "Use local coordinate system of host", GH_ParamAccess.list, false);
       }
 

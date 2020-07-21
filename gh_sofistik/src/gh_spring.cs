@@ -19,6 +19,7 @@ namespace gh_sofistik.Structure
       public Vector3d Direction { get; set; } = new Vector3d(0,0,1);
 
       private CouplingCondition _cplCond = new CouplingCondition();
+      private InfoPanel _infoPanel;
 
       public BoundingBox ClippingBox
       {
@@ -79,20 +80,34 @@ namespace gh_sofistik.Structure
          if (!DrawUtil.CheckSelection(col))
             col = DrawUtil.DrawColorSupports;
          else
-            _cplCond.DrawInfo(args);
+            drawInfoPanel(args.Pipeline, args.Viewport);
 
          _cplCond.Draw(args.Pipeline, col);
+      }
+
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               if (Value.IsACurve)
+                  _infoPanel.Positions.Add(Value.CurveA.PointAtNormalizedLength(0.5));
+               else
+                  _infoPanel.Positions.Add(Value.PointA.Location);
+               if (GroupId != 0)
+                  _infoPanel.Content.Add("Grp: " + GroupId);
+               _infoPanel.Content.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
       }
 
       private void updateSpring()
       {
          _cplCond = new CouplingCondition();
-         List<string> sl = new List<string>();
-         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
-         if (GroupId > 0)
-            sl.Add("Grp: " + GroupId);
-
-         _cplCond.CreateSpringSymbols(Value.GetSingleInputPoints(), sl, Direction);
+         _cplCond.CreateSpringSymbols(Value.GetSingleInputPoints(), Direction);
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -125,7 +140,12 @@ namespace gh_sofistik.Structure
          if (nc.Value.IsACurve)
             nc.Value.CurveA.Transform(xform);
          else
-            nc.Value.PointA.Transform(xform);         
+            nc.Value.PointA.Transform(xform);
+
+         var localDir = nc.Direction;
+         localDir.Transform(xform);
+         nc.Direction = localDir;
+
          return nc;
       }
 

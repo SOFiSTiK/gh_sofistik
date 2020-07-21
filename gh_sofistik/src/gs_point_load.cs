@@ -19,8 +19,11 @@ namespace gh_sofistik.Load
       public bool UseHostLocal { get; set; } = false;
       public Vector3d Forces { get; set; } = new Vector3d();
       public Vector3d Moments { get; set; } = new Vector3d();
+      public Vector3d Displacement { get; set; } = new Vector3d();
+      public Vector3d DisplacementRotational { get; set; } = new Vector3d();
 
       private LoadCondition _loadCondition = new LoadCondition();
+      private InfoPanel _infoPanel;
 
       public GS_StructuralPoint ReferencePoint { get; set; }
 
@@ -63,6 +66,8 @@ namespace gh_sofistik.Load
             LoadCase = this.LoadCase,
             Forces = this.Forces,
             Moments = this.Moments,
+            Displacement = this.Displacement,
+            DisplacementRotational = this.DisplacementRotational,
             UseHostLocal = this.UseHostLocal
          };
       }
@@ -108,11 +113,18 @@ namespace gh_sofistik.Load
          if (!(Value is null))   //if no point or, force AND moment are zero, nothing to draw
          {  
             System.Drawing.Color col = args.Color;
-            if(!DrawUtil.CheckSelection(col))
+            if (!DrawUtil.CheckSelection(col))
+            {
                col = DrawUtil.DrawColorLoads;
+            }
+            else
+            {
+               drawInfoPanel(args.Pipeline, args.Viewport);
+            }
+
             args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, DrawUtil.DrawColorLoads);
 
-            if (!(Forces.IsTiny() && Moments.IsTiny()) && DrawUtil.ScaleFactorLoads > 0.0001) {
+            if (!(Forces.IsTiny() && Moments.IsTiny() && Displacement.IsTiny() && DisplacementRotational.IsTiny()) && DrawUtil.ScaleFactorLoads > 0.0001) {
                if (!_loadCondition.isValid)
                {
                   updateLoadTransforms();
@@ -122,9 +134,32 @@ namespace gh_sofistik.Load
          }
       }
 
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               _infoPanel.Positions.Add(Value.Location);
+
+               _infoPanel.Content.Add("LC: " + LoadCase);
+               if (!Forces.IsTiny())
+                  _infoPanel.Content.Add("Force: " + Forces.Length);
+               if (!Moments.IsTiny())
+                  _infoPanel.Content.Add("Moment: " + Moments.Length);
+               if (!Displacement.IsTiny())
+                  _infoPanel.Content.Add("Displacement: " + Displacement.Length);
+               if (!DisplacementRotational.IsTiny())
+                  _infoPanel.Content.Add("Rot.Displacement: " + DisplacementRotational.Length);
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
+      }
+
       private void updateLoadTransforms()
       {
-         _loadCondition = new LoadCondition(Forces, Moments);
+         _loadCondition = new LoadCondition(Forces, Moments, Displacement, DisplacementRotational);
 
          Transform t = Rhino.Geometry.Transform.Identity;
          if (UseHostLocal) //transformation needed
@@ -134,8 +169,8 @@ namespace gh_sofistik.Load
             //set localX and localZ directions if pointload has referencepoint and if directions are not zero
             if (!(ReferencePoint is null))
             {
-               if (!ReferencePoint.DirectionLocalX.Equals(Vector3d.Zero)) lx = ReferencePoint.DirectionLocalX;
-               if (!ReferencePoint.DirectionLocalZ.Equals(Vector3d.Zero)) lz = ReferencePoint.DirectionLocalZ;
+               if (!ReferencePoint.DirectionLocalX.IsTiny()) lx = ReferencePoint.DirectionLocalX;
+               if (!ReferencePoint.DirectionLocalZ.IsTiny()) lz = ReferencePoint.DirectionLocalZ;
             }
             t = TransformUtils.GetGlobalTransformPoint(lx, lz);   //setup transform
          }
@@ -175,8 +210,10 @@ namespace gh_sofistik.Load
       {
          pManager.AddGeometryParameter("Hosting Point / Spt", "Pt / Spt", "Hosting Point / SOFiSTiK Structural Point", GH_ParamAccess.list);
          pManager.AddIntegerParameter("LoadCase", "LoadCase", "Id of Load Case", GH_ParamAccess.list, 1);
-         pManager.AddVectorParameter("Force", "Force", "Acting Force", GH_ParamAccess.list, new Vector3d());
-         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Force", "Force", "Acting Force [kN]", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Moment", "Moment", "Acting Moment [kNm]", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Displacement", "Disp", "Displacement [mm]", GH_ParamAccess.list, new Vector3d());
+         pManager.AddVectorParameter("Rotational Displacement", "RotDisp", "Rotational Displacement [rad]", GH_ParamAccess.list, new Vector3d());
          pManager.AddBooleanParameter("HostLocal", "HostLocal", "Use local coordinate system of host", GH_ParamAccess.list, false);
       }
 
@@ -191,7 +228,9 @@ namespace gh_sofistik.Load
          var loadcases = da.GetDataList<int>(1);
          var forces = da.GetDataList<Vector3d>(2);
          var moments = da.GetDataList<Vector3d>(3);
-         var hostlocals = da.GetDataList<bool>(4);
+         var displacements = da.GetDataList<Vector3d>(4);
+         var rotationalDisplacements = da.GetDataList<Vector3d>(5);
+         var hostlocals = da.GetDataList<bool>(6);
 
          var gs_point_loads = new List<GS_PointLoad>();
 
@@ -206,6 +245,8 @@ namespace gh_sofistik.Load
                   LoadCase = loadcases.GetItemOrLast(i),
                   Forces = forces.GetItemOrLast(i),
                   Moments = moments.GetItemOrLast(i),
+                  Displacement = displacements.GetItemOrLast(i),
+                  DisplacementRotational = rotationalDisplacements.GetItemOrLast(i),
                   UseHostLocal = hostlocals.GetItemOrLast(i)
                };
 

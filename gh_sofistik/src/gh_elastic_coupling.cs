@@ -10,6 +10,7 @@ namespace gh_sofistik.Structure
    public class GH_Elastic_Coupling : GH_GeometricGoo<GH_CouplingStruc>, IGH_PreviewData
    {
       private CouplingCondition _cplCond = new CouplingCondition();
+      private InfoPanel _infoPanel;
 
       public int GroupId { get; set; } = 0;
 
@@ -89,20 +90,42 @@ namespace gh_sofistik.Structure
          if (!DrawUtil.CheckSelection(col))
             col = System.Drawing.Color.DarkViolet;
          else
-            _cplCond.DrawInfo(args);
+            drawInfoPanel(args.Pipeline, args.Viewport);
 
          _cplCond.Draw(args.Pipeline, col);
+      }
+
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               var lines = Value.GetConnectionLines();
+               if (lines.Count == 1)
+               {
+                  _infoPanel.Positions.Add((lines[0].From + lines[0].To) * 0.5);
+               }
+               else
+               {
+                  _infoPanel.Positions.Add((lines[0].From + lines[0].To) * 0.5);
+                  _infoPanel.Positions.Add((lines[lines.Count - 1].From + lines[lines.Count - 1].To) * 0.5);
+                  _infoPanel.Positions.Add((lines[0].From + lines[lines.Count - 1].From) * 0.5);
+                  _infoPanel.Positions.Add((lines[0].To + lines[lines.Count - 1].To) * 0.5);
+               }
+               if (GroupId != 0)
+                  _infoPanel.Content.Add("Grp: " + GroupId);
+               _infoPanel.Content.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
       }
 
       private void updateECoupling()
       {
          _cplCond = new CouplingCondition();
-         List<string> sl = new List<string>();
-         sl.Add("Stf: " + Axial_stiffness + " / " + Rotational_stiffness + " / " + Transversal_stiffness);
-         if (GroupId > 0)
-            sl.Add("Grp: " + GroupId);
-
-         _cplCond.CreateDottedLineSymbols(Value.GetConnectionLines(), sl);
+         _cplCond.CreateDottedLineSymbols(Value.GetConnectionLines());
       }
 
       public override IGH_GeometricGoo DuplicateGeometry()
@@ -147,6 +170,11 @@ namespace gh_sofistik.Structure
             nc.Value.CurveB.Transform(xform);
          else
             nc.Value.PointB.Transform(xform);
+
+         var localDir = nc.Direction;
+         localDir.Transform(xform);
+         nc.Direction = localDir;
+
          return nc;
       }
 

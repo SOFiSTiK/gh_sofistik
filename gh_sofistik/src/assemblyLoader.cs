@@ -23,7 +23,7 @@ namespace gh_sofistik
                   foreach (var file in System.IO.Directory.GetFiles(folderInfo.Folder))
                   {
                      var fileName = System.IO.Path.GetFileName(file);
-                     if (fileName == "sof_gh_sofistik_rhino.gha")
+                     if (fileName == "sof_gh_sofistik-70.gha" || fileName == "sof_gh_sofistik_rhino.gha")
                         skip = true;
                      if (skip)
                         break;
@@ -87,7 +87,7 @@ namespace gh_sofistik
 
       private void OnHelpClick(object sender, EventArgs e)
       {
-         System.Diagnostics.Process.Start("http://www.sofistik.de");
+         System.Diagnostics.Process.Start("https://www.sofistik.de/documentation/2020/en/rhino_interface/grasshopper/index.html");
       }
 
       private System.Windows.Forms.Form _aboutDlg;
@@ -137,6 +137,28 @@ namespace gh_sofistik
          {
             autoEvent.Set();
          }
+      }
+   }
+
+   public static class AssemblyHelper
+   {
+      private static readonly string SOFIINSTALLPATHREGKEY = "Software\\SOFiSTiK\\InstallLocation";
+      private static readonly string SOFIINSTALLPATHREGKEYVERSION = "sofistik_2020";
+
+      public static string GetSofistikExecutableDir()
+      {
+         string installation_path = "";
+         var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SOFIINSTALLPATHREGKEY);
+         if (key != null)
+         {
+            var val = key.GetValue(SOFIINSTALLPATHREGKEYVERSION);
+            if (val != null)
+            {
+               installation_path = val.ToString();
+               installation_path = System.IO.Path.GetFullPath(installation_path);
+            }
+         }
+         return installation_path;
       }
    }
 }

@@ -2,16 +2,92 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
 using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 
+namespace gh_sofistik.General
+{
+   public enum SofistikModelType
+   {
+      AQUA = 1,
+      SofiMSHC = 2,
+      SofiLOAD = 3,
+      Tendon = 4,
+      Analysis = 5,
+   }
+
+   public class SofistikModel : IComparable
+   {
+      public string CadInp { get; set; }
+      public SofistikModelType ModelType { get; set; }
+      public SofistikModel()
+      {
+         CadInp = "";
+         ModelType = SofistikModelType.AQUA;
+      }
+      public SofistikModel Duplicate()
+      {
+         return new SofistikModel()
+         {
+            CadInp = CadInp,
+            ModelType = ModelType,
+         };
+      }
+
+      public int CompareTo(object obj)
+      {
+         if(obj is SofistikModel)
+         {
+            var other = obj as SofistikModel;
+            return this.ModelType.CompareTo(other.ModelType);
+         }
+         return -1;
+      }
+   }
+
+   public class GH_SofistikModel : GH_Goo<SofistikModel>
+   {
+      public override bool IsValid => Value != null;
+
+      public override string TypeName => "GH_SofistikModel";
+
+      public override string TypeDescription => "GH_SofistikModel";
+
+      public override IGH_Goo Duplicate()
+      {
+         return new GH_SofistikModel() { Value = Value.Duplicate() };
+      }
+
+      public override string ToString()
+      {
+         return Value.CadInp;
+      }
+
+      public override bool CastTo<Q>(ref Q target)
+      {
+         if (typeof(Q).IsAssignableFrom(typeof(GH_String)))
+         {
+            var ghCadinpString = new GH_String(Value.CadInp);
+            target = (Q)(object)ghCadinpString;
+            return true;
+         }
+         else
+            return base.CastTo(ref target);
+      }
+   }
+}
+
 namespace gh_sofistik.Structure
 {
+
    public class CreateSofimshcInput : GH_Component
    {
       private System.Drawing.Bitmap _icon;
-      private BoundingBox _boundingBox=new BoundingBox();
+      private BoundingBox _boundingBox = new BoundingBox();
+      private string _manualPath = "";
 
       public CreateSofimshcInput()
          : base("SOFiMSHC", "SOFiMSHC", "Creates a SOFiMSHC input file", "SOFiSTiK", "Structure")
@@ -34,20 +110,21 @@ namespace gh_sofistik.Structure
 
       protected override void RegisterInputParams(GH_InputParamManager pManager)
       {
-         pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.list);
+         pManager.AddGeometryParameter("Structural Elements", "Se", "Collection of SOFiSTiK Structural elements", GH_ParamAccess.tree);
          pManager.AddBooleanParameter("Init System", "Init System", "Initializes a new SOFiSTiK calculation system. At least one SOFiMSHC component needs this to be true. If true, all existing system data gets deleted", GH_ParamAccess.item, true);
          pManager.AddBooleanParameter("Create mesh", "Create Mesh", "Activates mesh generation", GH_ParamAccess.item, true);
-         pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size in [m] (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 0.0);
+         pManager.AddNumberParameter("Mesh Density", "Mesh Density", "Sets the maximum element size (parameter HMIN in SOFiMSHC)", GH_ParamAccess.item, 0.0);
          pManager.AddNumberParameter("Intersection tolerance", "Tolerance", "Geometric intersection tolerance in [m]", GH_ParamAccess.item, 0.01);
          pManager.AddIntegerParameter("Start Index", "Start Index", "Start index for automatically assigned Structural Element numbers", GH_ParamAccess.item, 1000);
          pManager.AddIntegerParameter("Group Divisor", "Group Divisor", "Group Divisor for assigning Element Numbers to a Group", GH_ParamAccess.item, -1000);
-         pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.item, string.Empty);
-         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of Structural Elements", GH_ParamAccess.item, string.Empty);
+         pManager.AddTextParameter("Control Values", "Add. Ctrl", "Additional SOFiMSHC control values", GH_ParamAccess.list, string.Empty);
+         pManager.AddTextParameter("User Text", "User Text", "Additional text input being placed after the definition of Structural Elements", GH_ParamAccess.list, string.Empty);
       }
 
       protected override void RegisterOutputParams(GH_OutputParamManager pManager)
       {
-         pManager.AddTextParameter("Text input", "O", "SOFiMSHC text input", GH_ParamAccess.item);
+         //pManager.AddTextParameter("Text input", "O", "SOFiMSHC text input", GH_ParamAccess.item);
+         pManager.AddGenericParameter("Text input", "O", "SOFiMSHC text input", GH_ParamAccess.item);
       }
 
       public override void DrawViewportWires(IGH_PreviewArgs args)
@@ -56,26 +133,59 @@ namespace gh_sofistik.Structure
 
          if (this.Attributes.Selected)
          {
-            args.Display.DrawBox(_boundingBox, args.WireColour_Selected);            
+            args.Display.DrawBox(_boundingBox, args.WireColour_Selected);
          }
-      }   
+      }
+
+      public override void AppendAdditionalMenuItems(ToolStripDropDown menu)
+      {
+         base.AppendAdditionalComponentMenuItems(menu);
+
+         if (string.IsNullOrEmpty(_manualPath))
+         {
+            var exeDir = AssemblyHelper.GetSofistikExecutableDir();
+            if(!string.IsNullOrWhiteSpace(exeDir) && System.IO.Directory.Exists(exeDir))
+            {
+               var manualPath = System.IO.Path.Combine(exeDir, "sofimshc_1.pdf");
+               if (System.IO.File.Exists(manualPath))
+               {
+                  _manualPath = manualPath;
+               }
+            }
+         }
+
+         if(!string.IsNullOrWhiteSpace(_manualPath) && System.IO.File.Exists(_manualPath))
+         {
+            Menu_AppendSeparator(menu);
+            Menu_AppendItem(menu, "Open Manual", Menu_OnOpenManual);
+         }
+      }
+
+      private void Menu_OnOpenManual(object sender, EventArgs e)
+      {
+         if (!string.IsNullOrWhiteSpace(_manualPath) && System.IO.File.Exists(_manualPath))
+         {
+            System.Diagnostics.Process.Start(@_manualPath);
+         }
+      }
 
       protected override void SolveInstance(IGH_DataAccess da)
       {
+         var ghElements = da.GetDataTree<IGH_GeometricGoo>(0);
          bool initSystem = da.GetData<bool>(1);
          bool mesh = da.GetData<bool>(2);
          double hmin = da.GetData<double>(3);
          double tolg = da.GetData<double>(4);
          int idBorder = da.GetData<int>(5);
          int gdiv = da.GetData<int>(6);
-         string ctrl = da.GetData<string>(7);
-         string text = da.GetData<string>(8);
+         var ctrlList = da.GetDataList<string>(7);
+         var textList = da.GetDataList<string>(8);
 
          var structural_elements_pre = new List<IGS_StructuralElement>();
          List<GH_GeometricGoo<GH_CouplingStruc>> coupling_information = new List<GH_GeometricGoo<GH_CouplingStruc>>();
          var axis_elements = new List<IGH_Axis>();
 
-         foreach (var it in da.GetDataList<IGH_Goo>(0))
+         foreach (var it in ghElements.AllData(true))
          {
             if (it is IGS_StructuralElement)
                structural_elements_pre.Add(it as IGS_StructuralElement);
@@ -119,7 +229,8 @@ namespace gh_sofistik.Structure
 
          // pre-process axis elements and perform check for structural lines if they lie on axis
          var gaxDefinitions = new StringBuilder();
-         var axisAdded = getAxisDefinitions(axis_elements, gaxDefinitions, tU);
+         string gaxId = "AI0";
+         var axisAdded = getAxisDefinitions(axis_elements, gaxDefinitions, gaxId, tU);
          var slnReferences = calcSlnReferences(structural_elements, axisAdded, tolg, write_id_back_to_zero, ref id);
 
          // init boundingbox
@@ -151,12 +262,16 @@ namespace gh_sofistik.Structure
          if (mesh)
          {
             sb.AppendLine("CTRL MESH 1");
-            sb.AppendFormat("CTRL HMIN {0}\n", hmin != 0.0 ? string.Format("{0:F4}", hmin) : "-");
+            sb.AppendFormat("CTRL HMIN {0}\n", hmin != 0.0 ? string.Format("{0:F4}", (scaleUnit ? hmin * unitFactor : hmin)) : "-");
+            if (axisAdded.Any())
+               sb.AppendLine("CTRL TOPO GAXP 0");
          }
 
          // add control string
-         if (!string.IsNullOrEmpty(ctrl))
-            sb.Append(ctrl);
+         foreach (var ctrl in ctrlList)
+            if (!string.IsNullOrEmpty(ctrl))
+               sb.AppendLine(ctrl);
+
          sb.AppendLine();
 
          // write axis elements
@@ -320,13 +435,15 @@ namespace gh_sofistik.Structure
                   sb.AppendLine();
 
                   // outer boundary
-                  AppendSurfaceBoundary(sb, fc);
+                  AppendSurfaceBoundary(sb, fc, scaleUnit, unitFactor, sar.ThickessAtEdges);
 
                   // write geometry
                   if (fc.IsPlanar() == false)
                   {
                      AppendSurfaceGeometry(sb, fc.ToNurbsSurface());
                   }
+                  // TODO: write SARC BLIN in case no direction X is given, face is planar and surface 
+                  // has been generated along a bridge to force local direction following the boundary curves
                }
             }            
             else
@@ -337,13 +454,22 @@ namespace gh_sofistik.Structure
          sb.AppendLine();
 
          // add additional text
-         if (!string.IsNullOrEmpty(text))
-         {
-            sb.Append(text);
-         }
+         foreach (var text in textList)
+            if (!string.IsNullOrEmpty(text))
+               sb.AppendLine(text);
+
          sb.AppendLine();
+
          sb.AppendLine("END");
 
+         if (mesh && axisAdded.Where(e => e.Item3).Any())
+         {
+            sb.AppendLine();
+            sb.AppendLine("+PROG AQUA");
+            sb.AppendLine("HEAD");
+            sb.AppendLine("INTE 0");
+            sb.AppendLine("END");
+         }
 
          foreach (IGS_StructuralElement se in write_id_back_to_zero)
             se.Id = 0;
@@ -354,8 +480,13 @@ namespace gh_sofistik.Structure
          foreach (var tp in set_references_back_B)
             tp.Item1.Value.Reference_B = tp.Item2;
 
-
-         da.SetData(0, sb.ToString());
+         // create output objects
+         var mshcModel = new gh_sofistik.General.SofistikModel() { CadInp = sb.ToString(), ModelType = gh_sofistik.General.SofistikModelType.SofiMSHC };
+         var ghMshcModel = new gh_sofistik.General.GH_SofistikModel() { Value = mshcModel };
+         // create GH_Structure and use SetDataTree so output has always one branch with index {0}
+         var outStruc = new GH_Structure<gh_sofistik.General.GH_SofistikModel>();
+         outStruc.Append(ghMshcModel);
+         da.SetDataTree(0, outStruc);
       }
 
       #region Id distribution and preprocessing
@@ -485,19 +616,19 @@ namespace gh_sofistik.Structure
                structural_elements_merged.Add(se);
       }
 
-      private List<(string, Curve)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions, Transform tU)
+      private List<(string, Curve, bool)> getAxisDefinitions(List<IGH_Axis> axis_elements, StringBuilder axisDefinitions, string id, Transform tU)
       {
-         var addedAxis = new List<(string, Curve)>();
+         var addedAxis = new List<(string, Curve, bool)>();
          foreach (var ax in axis_elements)
          {
-            var res = ax.GetAxisDefinition(axisDefinitions, addedAxis, tU);
+            var res = ax.GetAxisDefinition(axisDefinitions, addedAxis, ref id, tU);
             if (res.Item1 != GH_RuntimeMessageLevel.Blank)
                AddRuntimeMessage(res.Item1, res.Item2);
          }
          return addedAxis;
       }
       
-      private Dictionary<int, (string, string, string)> calcSlnReferences(List<IGS_StructuralElement> structural_elements, List<(string, Curve)> addedAxis, double tolg, List<IGS_StructuralElement> write_id_back_to_zero, ref int id) { 
+      private Dictionary<int, (string, string, string)> calcSlnReferences(List<IGS_StructuralElement> structural_elements, List<(string, Curve, bool)> addedAxis, double tolg, List<IGS_StructuralElement> write_id_back_to_zero, ref int id) { 
 
          //collect structural pts
          var sptList = new List<GS_StructuralPoint>();
@@ -570,7 +701,14 @@ namespace gh_sofistik.Structure
                         write_id_back_to_zero.Add(sln);
                      }
 
-                     slnReferences.Add(sln.Id, (axRef, sptA.Id.ToString(), sptE.Id.ToString()));
+                     if (slnReferences.ContainsKey(sln.Id))
+                     {
+                        AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "SLN " + sln.Id + " lays completely in Axis " + slnReferences[sln.Id].Item1 + " and " + axRef + ". It will be assigned to " + slnReferences[sln.Id].Item1);
+                     }
+                     else
+                     {
+                        slnReferences.Add(sln.Id, (axRef, sptA.Id.ToString(), sptE.Id.ToString()));
+                     }
                   }
                }
             }
@@ -992,7 +1130,7 @@ namespace gh_sofistik.Structure
       #endregion
 
       #region SURFACE_GEOMETRY
-      private void AppendSurfaceBoundary(StringBuilder sb, BrepFace fc)
+      private void AppendSurfaceBoundary(StringBuilder sb, BrepFace fc, bool scaleUnit, double uFac, List<double> thickness_at_edges = null)
       {
          foreach (var loop in fc.Loops)
          {
@@ -1004,9 +1142,9 @@ namespace gh_sofistik.Structure
             else
                continue;
 
-            foreach (var tr in loop.Trims)
+            for( int i=0; i< loop.Trims.Count; i++)
             {
-               var ed = tr.Edge;
+               var ed = loop.Trims[i].Edge;
                if (ed != null)
                {
                   Curve curve = ed.EdgeCurve;
@@ -1027,8 +1165,15 @@ namespace gh_sofistik.Structure
                      curve = ed.EdgeCurve.Trim(t0, t1);
                   }
 
-                  // write to output
+                  // write boundary record
                   sb.AppendFormat("SARB {0}", type);
+
+                  if(thickness_at_edges != null) // optional thickness
+                  {
+                     double thk = i < thickness_at_edges.Count ? (scaleUnit ? thickness_at_edges[i] * uFac : thickness_at_edges[i]) : 0.0;
+                     sb.AppendFormat(" T {0:F6}", thk);
+                  }
+
                   sb.AppendLine();
                   AppendCurveGeometry(sb, curve);
                }
@@ -1097,7 +1242,7 @@ namespace gh_sofistik.Structure
 
    public interface IGH_Axis
    {
-      (GH_RuntimeMessageLevel, string) GetAxisDefinition(StringBuilder sb, List<(string, Curve)> addedAxis, Transform tU);
+      (GH_RuntimeMessageLevel, string) GetAxisDefinition(StringBuilder sb, List<(string, Curve, bool)> addedAxis, ref string id, Transform tU);
    }
 
 }

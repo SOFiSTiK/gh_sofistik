@@ -25,6 +25,7 @@ namespace gh_sofistik.Structure
       private SupportCondition _supp_condition = null;
 
       private LocalFrameVisualisation _localFrame = new LocalFrameVisualisation();
+      private InfoPanel _infoPanel;
 
       public string UserText { get; set; } = string.Empty;
 
@@ -112,7 +113,15 @@ namespace gh_sofistik.Structure
       public override IGH_GeometricGoo Transform(Transform xform)
       {
          var dup = this.DuplicateGeometry() as GS_StructuralPoint;
+
          dup.Value.Transform(xform);
+
+         var localVX = dup.DirectionLocalX;
+         var localVZ = dup.DirectionLocalZ;
+         localVX.Transform(xform);
+         localVZ.Transform(xform);
+         dup.DirectionLocalX = localVX;
+         dup.DirectionLocalZ = localVZ;
 
          return dup;
       }
@@ -142,7 +151,10 @@ namespace gh_sofistik.Structure
                colSup = System.Drawing.Color.Black;
             }
             else
+            {
                drawLocalFrame(args.Pipeline);
+               drawInfoPanel(args.Pipeline, args.Viewport);
+            }
 
             args.Pipeline.DrawPoint(Value.Location, Rhino.Display.PointStyle.X, 5, colStr);
 
@@ -159,11 +171,26 @@ namespace gh_sofistik.Structure
          }
       }
 
+      private void drawInfoPanel(Rhino.Display.DisplayPipeline pipeline, Rhino.Display.RhinoViewport viewport)
+      {
+         if (DrawUtil.DrawInfo)
+         {
+            if (_infoPanel == null)
+            {
+               _infoPanel = new InfoPanel();
+               _infoPanel.Positions.Add(Value.Location);
+               if (Id != 0)
+                  _infoPanel.Content.Add("Id: " + Id);
+            }
+            _infoPanel.Draw(pipeline, viewport);
+         }
+      }
+
       private void drawLocalFrame(Rhino.Display.DisplayPipeline pipeline)
       {
          if (DrawUtil.ScaleFactorLocalFrame > 0.0001)
          {
-            if (!_localFrame.isValid)
+            if (!_localFrame.IsValid)
                updateLocalFrameTransforms();
             _localFrame.Draw(pipeline);
          }
@@ -191,7 +218,7 @@ namespace gh_sofistik.Structure
       {
          if (DrawUtil.ScaleFactorSupports > 0.0001 && _supp_condition.HasSupport)
          {
-            if (!_supp_condition.isValid)
+            if (!_supp_condition.IsValid)
             {
                updateSupportTransforms();
             }
@@ -228,33 +255,38 @@ namespace gh_sofistik.Structure
          {
             var att = baking_attributes.Duplicate();
 
-            string fix_literal = this.FixLiteral
-               .Replace("PP", "PXPYPZ")
-               .Replace("MM", "MXMYMZ");
-
-            if (fix_literal == "F")
-               fix_literal = "PXPYPZMXMYMZ";
-
-
             att.SetUserString("SOF_OBJ_TYPE", "SPT");
-            att.SetUserString("SOF_ID", this.Id.ToString());
+            att.SetUserString("SOF_ID", Math.Max(0,Id).ToString());
 
             if(DirectionLocalX.Length > 1.0E-6)
             {
-               att.SetUserString("SOF_SX", this.DirectionLocalX.X.ToString("F6"));
-               att.SetUserString("SOF_SY", this.DirectionLocalX.Y.ToString("F6"));
-               att.SetUserString("SOF_SZ", this.DirectionLocalX.Z.ToString("F6"));
+               var dir_x = DirectionLocalX; dir_x.Unitize();
+
+               att.SetUserString("SOF_SX", dir_x.X.ToString("F6"));
+               att.SetUserString("SOF_SY", dir_x.Y.ToString("F6"));
+               att.SetUserString("SOF_SZ", dir_x.Z.ToString("F6"));
             }
             if(DirectionLocalZ.Length > 1.0E-6)
             {
-               att.SetUserString("SOF_NX", this.DirectionLocalZ.X.ToString("F6"));
-               att.SetUserString("SOF_NY", this.DirectionLocalZ.Y.ToString("F6"));
-               att.SetUserString("SOF_NZ", this.DirectionLocalZ.Z.ToString("F6"));
+               var dir_z = DirectionLocalZ; dir_z.Unitize();
+
+               att.SetUserString("SOF_NX", DirectionLocalZ.X.ToString("F6"));
+               att.SetUserString("SOF_NY", DirectionLocalZ.Y.ToString("F6"));
+               att.SetUserString("SOF_NZ", DirectionLocalZ.Z.ToString("F6"));
             }
 
-            if(string.IsNullOrEmpty(fix_literal) == false)
-               att.SetUserString("SOF_FIX", fix_literal);
+            if(string.IsNullOrEmpty(fixLiteral) == false)
+            {
+               string fix_literal = FixLiteral.Replace("PP", "PXPYPZ").Replace("MM", "MXMYMZ");
 
+               if (fix_literal == "F")
+                  fix_literal = "PXPYPZMXMYMZ";
+
+               att.SetUserString("SOF_FIX", fix_literal);
+            }
+
+            if (string.IsNullOrWhiteSpace(UserText) == false)
+               att.SetUserString("SOF_USERTXT", UserText);
 
             obj_guid = doc.Objects.AddPoint(Value.Location, att);
          }
